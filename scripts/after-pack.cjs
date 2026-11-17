@@ -11,6 +11,11 @@ module.exports = async function afterPack(context) {
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error('Refusing to change integrity labels outside the release application directory')
   }
+  // Installer stubs are generated beside appOutDir and executed during NSIS
+  // packaging. New files there must inherit the same normal integrity level.
+  execFileSync('icacls.exe', [path.dirname(output), '/setintegritylevel', '(OI)(CI)M'], {
+    windowsHide: true, stdio: 'pipe'
+  })
   execFileSync('icacls.exe', [output, '/setintegritylevel', '(OI)(CI)M', '/T', '/C'], {
     windowsHide: true, stdio: 'pipe'
   })
