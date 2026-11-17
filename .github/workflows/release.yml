@@ -1,0 +1,98 @@
+name: Release Windows
+
+on:
+  workflow_dispatch:
+  # Bootstrap the first release when this workflow is added. Later releases
+  # can be started manually; an existing version is never overwritten.
+  push:
+    branches: [main]
+    paths: [.github/workflows/release.yml]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: utf-8
+
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Read release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Python dependencies
+        run: python -m pip install -r python/requirements.txt
+      - name: Run all required checks
+        run: npm test
+      - name: Build clean Windows installer
+        run: npm run dist -- --win --x64 --publish never
+      - name: Prepare release assets
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $installer = "release/PaperDesk-$env:RELEASE_VERSION-x64-Setup.exe"
+          $notes = "docs/RELEASE-v$env:RELEASE_VERSION.md"
+          if (!(Test-Path $installer) -or !(Test-Path $notes)) { throw 'Release files missing' }
+          $assets = New-Item -ItemType Directory -Path release/assets -Force
+          Copy-Item $installer $assets
+          Copy-Item $notes $assets
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path $installer -Leaf)" | Set-Content release/assets/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release/assets/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: assets
+      - name: Publish version without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${RELEASE_VERSION}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists; leaving it unchanged."
+            exit 0
+          fi
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "PaperDesk $tag" \
+            --notes-file "assets/RELEASE-${tag}.md" \
+            "assets/PaperDesk-${RELEASE_VERSION}-x64-Setup.exe" \
+            assets/SHA256SUMS.txt

@@ -22,6 +22,8 @@ npm run dev
 
 构建公开 Windows 安装包运行 `npm run dist`，产物在 `release/`。该命令只打包程序资源；个人数据快照需另行显式执行下方的自用打包命令。
 
+仓库的 **Actions → Release Windows → Run workflow** 可在干净的 Windows 环境中执行完整测试、构建安装包，并发布对应版本的 Release 和 SHA-256 校验文件。首次添加发布工作流时也会触发；已有版本保持原样，不覆盖已有附件。发布说明见 [v0.1.0](docs/RELEASE-v0.1.0.md)。
+
 ## v0.1.0：设置与模型接口（2026-11-17）
 
 PaperDesk 是本地论文研究工作台，提供 PDF 阅读与批注、保版式翻译、论文拆解、笔记、知识库、文献检索和批处理。
