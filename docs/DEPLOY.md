@@ -1,66 +1,94 @@
-# 部署与发布（DEPLOY）
+# 安装、部署与发布
 
-> 阶段 4「安装与发布」文档。目标：**在一台没有开发环境的 Windows 机器上**完成安装 → 导入 → 阅读 → 翻译 → 导出。
+本文适用于 PaperDesk v0.1.0 的 Windows x64 版本。
 
-## 1. Python 边车（sidecar）的提供方式
+## 安装程序
 
-当前决策：**Python 由外部提供**（不内置解释器）。
-- 运行机需求：**Python ≥ 3.10** + 依赖 `python/requirements.txt`（版本已锁定）。
-- 安装依赖：`python -m pip install -r python/requirements.txt`。
-- 也可用 `PAPERDESK_PYTHON` 环境变量指定解释器路径（便于使用虚拟环境/独立发行版）。
+从 [Releases](https://github.com/JackieYuwhu/paperdesk/releases/latest) 下载 `PaperDesk-0.1.0-x64-Setup.exe`，运行安装向导并选择安装目录。程序包不包含 Python 解释器。
 
-> 打包配置（`package.json` 的 `build.extraResources`）会把 `python/` 目录**随包分发**到应用的 `resources/`，
-> 但**解释器本身**仍来自运行机。若要做到“零外部依赖”，后续可内置 embeddable Python 或 PyInstaller 产物——列为后续项。
+PDF 解析等功能需要 Python 3.10+，建议使用已在发布流程中验证的 Python 3.13。安装 Python 后，在 PowerShell 中设置实际的程序安装目录并安装依赖：
 
-## 2. 资源路径
-
-应用按是否打包决定 sidecar 的工作目录：
-- 开发：`<repo>/python`（`join(__dirname, '../..')/python`）。
-- 打包：`<安装目录>/resources/python`（`process.resourcesPath`）。
-
-两者都由 `src/main/sidecar/manager.ts` 的 `pythonDir()` 统一处理。
-
-## 3. 原生依赖（better-sqlite3）
-
-- `better-sqlite3` 是原生模块，**必须针对 Electron 的 ABI 重建**：
-  - 安装时：`postinstall` → `electron-builder install-app-deps` 自动处理；
-  - 手动重建：`npm run rebuild`。
-- 若报 `NODE_MODULE_VERSION` 不匹配，几乎总是这一步没做。
-
-## 4. 构建与打包
-
-```bash
-npm ci
-npm run typecheck            # 类型检查
-npm run ci                   # 一键：类型检查 + 单测 + 坐标 + Python 单测 + 冒烟
-npm run preflight            # 安装预检：Node/Python/依赖/sidecar 能否起来
-npm run dist                 # electron-vite build + electron-builder → release/
+```powershell
+$appDir = 'D:\Apps\PaperDesk'
+python --version
+python -m pip install -r "$appDir\resources\python\requirements.txt"
 ```
-- 打包产物：`release/`（Windows NSIS 安装包）。`release/` 已 gitignore。
-- `extraResources` 会把 `python/` 放进 `resources/python`。
 
-## 5. 升级
+`D:\Apps\PaperDesk` 是示例路径，请替换为实际安装目录。安装完成后重新启动 PaperDesk，在「设置 → 外观与诊断 → 服务自检」点击「检测解析服务」。
 
-- 覆盖安装即可；**用户数据不受影响**（见下）。
-- 数据库列级迁移在启动时自动执行（`src/main/db/migrate.ts`）：旧库缺列会自动补，**不丢数据**。
+### 指定 Python 解释器
 
-## 6. 用户数据位置与卸载
+应用默认调用 `python`。如需使用虚拟环境或指定解释器，可在 PowerShell 中设置环境变量，再从同一窗口启动程序：
 
-- 数据根目录：`%APPDATA%/paperdesk/data`（Linux: `~/.config/paperdesk/data`，macOS: `~/Library/Application Support/paperdesk/data`）。
-  - SQLite：`library.sqlite`；附件：`storage/`；笔记：`notes/`；译文产物：`translated/`；批处理产物：`batch/`；自动备份：`backups/`。
-  - 可用环境变量 `PAPERDESK_DATA` 覆盖（测试/便携模式）。
-- **卸载**：卸载程序会删除安装目录与快捷方式；**用户数据目录默认保留**（避免误删论文/笔记）。如需彻底清除，请手动删除上面的数据目录。
-- 建议：重要数据请用「设置 → 数据安全 → 备份数据库」，备份文件（`*.sqlite`）可随时「从备份恢复」（恢复前会自动安全备份当前库）。
+```powershell
+$appDir = 'D:\Apps\PaperDesk'
+$env:PAPERDESK_PYTHON = 'D:\Python313\python.exe'
+& $env:PAPERDESK_PYTHON -m pip install -r "$appDir\resources\python\requirements.txt"
+& "$appDir\PaperDesk.exe"
+```
 
-## 7. 预检与排障
+以上路径均为示例。该设置仅对当前 PowerShell 及其启动的程序生效；从开始菜单启动时，需要在用户环境变量中配置同名变量，或确保 `python` 指向已安装依赖的解释器。
 
-- **预检**：`npm run preflight` —— 逐项检查 Node ≥22.18、Python ≥3.10、依赖可导入、sidecar 能启动并响应 `/health`。
-- 缺 Python：应用会**立即**给出「未找到 Python…（请安装 Python 3.10+，或通过 PAPERDESK_PYTHON 指定）」而不是干等。
-- 依赖缺失：先把 `python/requirements.txt` 装齐；`preflight` 会直接指出缺哪个包。
+### 校验安装包
 
-## 8. 已知缺口（本阶段未完成）
+下载发布页中的 `SHA256SUMS.txt`，并将下面命令的输出与文件中的值比较：
 
-- 安装包**未签名**、无自动更新（需证书/更新服务器）。
-- 未内置 Python 运行时（需运行机安装 Python）。
-- 仅在 Windows 上验证过打包链路；macOS/Linux 打包未验证。
-- 「无开发环境的真实机器」端到端安装验证需要在**干净机器**上人工执行（见 `docs/TRIAL.md`）。
+```powershell
+Get-FileHash .\PaperDesk-0.1.0-x64-Setup.exe -Algorithm SHA256
+```
+
+当前安装包未进行发布者证书签名；SHA-256 用于检查文件是否与发布附件一致。
+
+## 数据、升级与备份
+
+程序默认将文库保存在 `%APPDATA%\paperdesk\data`，与安装目录分开：
+
+| 内容 | 路径 |
+|---|---|
+| 文库数据库 | `library.sqlite` |
+| PDF 附件 | `storage/` |
+| Markdown 笔记 | `notes/` |
+| 翻译产物 | `translated/` |
+| 批处理产物 | `batch/` |
+
+`PAPERDESK_DATA` 可覆盖默认文库目录，需在程序启动前设置。
+
+升级前建议关闭程序并备份整个文库目录。设置中的数据库备份只保存数据库，迁移时还需保存附件、笔记和其他文件。卸载程序默认保留文库，重新安装后可继续使用。
+
+使用系统加密保存的模型密钥与 Windows 用户的加密环境关联。更换电脑或 Windows 账户后可能需要重新填写 API Key。提交问题时，请先移除日志或截图中的敏感内容。
+
+## 从源码构建
+
+需要 Node.js 22.18+（建议 24）、npm、Python 3.10+ 和 Windows 原生模块构建工具。
+
+```powershell
+npm ci
+python -m pip install -r python/requirements.txt
+npm test
+npm run build
+npm run dist
+```
+
+安装包输出到 `release/`。打包内容包括 Electron 程序资源、运行依赖和 `resources/python` 下的 Python 源码及依赖清单；解释器由运行环境提供。
+
+`better-sqlite3` 必须匹配 Electron 的 ABI，安装依赖时会自动处理。若出现 `NODE_MODULE_VERSION` 不匹配，可执行 `npm run rebuild` 后重试。
+
+## 发布流程
+
+1. 更新程序版本号和 `docs/RELEASE-v<版本号>.md` 发布说明。
+2. 将变更同步到仓库的 `main` 分支。
+3. 在 **Actions → Release Windows → Run workflow** 启动发布。
+
+工作流在干净的 Windows 环境中安装依赖、运行 `npm test`、构建安装包并生成 SHA-256 校验文件。构建成功后，发布作业创建版本标签和 GitHub Release。已有同版本 Release 时保持原样，不覆盖附件；发布新版本需先更新版本号。
+
+发布工作流文件首次添加或变更时也会自动触发。构建作业只读取仓库内容，发布作业使用 GitHub 提供的短期令牌写入 Release，无需在仓库保存个人 API Key。
+
+## 常见问题
+
+- **找不到 Python**：确认 `python --version` 可用，或设置 `PAPERDESK_PYTHON` 为实际解释器路径。
+- **提示缺少模块**：使用应用所调用的同一个 Python 解释器安装 `requirements.txt` 中的依赖。
+- **模型连接失败**：核对协议、Base URL、模型 ID 和 API Key，再点击「保存并测试连接」。
+- **原生数据库模块无法加载**：源码开发环境执行 `npm run rebuild`；安装版请提供程序版本和错误信息。
+- **解析服务失败**：在设置中运行服务自检，并检查文库默认目录下的 `logs/sidecar.log`；反馈前先脱敏。
+
+当前仅验证 Windows x64，尚未内置 Python、发布者证书签名或自动更新。复杂文献的解析与翻译结果仍需人工核对。
