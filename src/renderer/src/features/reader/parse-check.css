@@ -1,0 +1,215 @@
+/* 解析检查面板（只读）：紧凑表格 + 三色状态点 + 长文本单行省略 */
+.parse-check {
+  flex: 0 0 320px;
+  width: 320px;
+  max-width: 320px;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  margin-left: 8px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  background: var(--bg-panel, #fff);
+  color: var(--text, #222);
+  overflow: hidden;
+}
+
+/* 面板打开时把浮层工具栏让到面板左侧，避免遮住表头 */
+.htmlwrap.htmlwrap--parse .htmlfind {
+  right: 336px;
+}
+
+.parse-check__head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border, #ddd);
+  background: var(--bg-panel, #fff);
+}
+
+.parse-check__titlebar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.parse-check__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text, #222);
+}
+
+.parse-check__total {
+  font-size: 11px;
+  color: var(--text-muted, #667085);
+  font-variant-numeric: tabular-nums;
+}
+
+.parse-check__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.parse-check__count--ok {
+  color: #2f9e44;
+}
+
+.parse-check__count--warn {
+  color: #b7791f;
+}
+
+.parse-check__count--error {
+  color: #d64545;
+}
+
+.parse-check__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.parse-check__chip {
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #ddd);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 9%, transparent);
+  color: var(--text-muted, #667085);
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.parse-check__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.parse-check__empty {
+  padding: 14px 12px;
+  color: var(--text-muted, #667085);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 空态：一句原因 + 一句怎么开启（不留空白） */
+.parse-check__empty-reason {
+  color: var(--text, #222);
+  font-weight: 500;
+}
+
+.parse-check__empty-hint {
+  margin-top: 6px;
+  color: var(--text-muted, #667085);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.parse-check__empty--error {
+  color: #d64545;
+}
+
+.parse-check__row {
+  display: grid;
+  grid-template-columns: 20px 48px 8px 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #ddd) 55%, transparent);
+  font-size: 11.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  outline: none;
+}
+
+.parse-check__row:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+}
+
+.parse-check__row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent, #3b82f6);
+}
+
+.parse-check__row.is-selected {
+  background: var(--accent-soft, #eaf1fe);
+}
+
+.parse-check__row--warn {
+  box-shadow: inset 2px 0 0 #e8a33d;
+}
+
+.parse-check__row--error {
+  box-shadow: inset 2px 0 0 #d64545;
+}
+
+.parse-check__row--error:focus-visible,
+.parse-check__row--warn:focus-visible {
+  box-shadow:
+    inset 2px 0 0 #d64545,
+    inset 0 0 0 2px var(--accent, #3b82f6);
+}
+
+.parse-check__index {
+  color: var(--text-muted, #667085);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.parse-check__type {
+  justify-self: start;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent);
+  color: var(--accent-strong, #2563eb);
+  font-size: 10.5px;
+}
+
+.parse-check__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  justify-self: center;
+  background: #9aa0a6;
+}
+
+.parse-check__dot--ok {
+  background: #2f9e44;
+}
+
+.parse-check__dot--warn {
+  background: #e8a33d;
+}
+
+.parse-check__dot--error {
+  background: #d64545;
+}
+
+.parse-check__loc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted, #667085);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.parse-check__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #222);
+}

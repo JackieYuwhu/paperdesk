@@ -1,0 +1,458 @@
+[
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 4,
+  "bbox": [
+   306.592529296875,
+   304.6273498535156,
+   329.2781677246094,
+   328.543212890625
+  ],
+  "raw_text": "Eʹ=m1",
+  "latex": "E ʹ=\\frac{1}{\\sqrt{m}}",
+  "status": "accepted",
+  "det": 1.0,
+  "rec": 0.6,
+  "structure_kinds": [
+   "frac",
+   "root",
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 4,
+  "bbox": [
+   331.8240051269531,
+   302.790771484375,
+   340.92718505859375,
+   311.2608947753906
+  ],
+  "raw_text": "u∕=v",
+  "latex": "u∕=v",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 4,
+  "bbox": [
+   306.59722900390625,
+   86.07635498046875,
+   355.12249755859375,
+   109.99224853515625
+  ],
+  "raw_text": "MinANE =N1",
+  "latex": "Min ANE =N 1",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 4,
+  "bbox": [
+   358.7532958984375,
+   84.3524169921875,
+   368.4045715332031,
+   92.822509765625
+  ],
+  "raw_text": "n=1",
+  "latex": "n=1",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 5,
+  "bbox": [
+   318.55694580078125,
+   694.5041198730469,
+   560.0048217773438,
+   742.3957023620605
+  ],
+  "raw_text": "network within a given time window centrality of a node Di,j(v) =∑jv ∈V, represented by [i,Dji,]j, the temporal degree (v), is defined as:",
+  "latex": "\\begin{pmatrix} &  &  &  & [i, & j] \\\\  &  & v \\in & V, represented by &  & D_{i},j(v \\\\  & \\sum^{j} &  &  &  &  \\\\ ) = &  &  &  &  & \\end{pmatrix}",
+  "status": "accepted",
+  "det": 1.0,
+  "rec": 0.9,
+  "structure_kinds": [
+   "matrix",
+   "op",
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 5,
+  "bbox": [
+   355.1817321777344,
+   687.2826843261719,
+   362.24951171875,
+   695.752799987793
+  ],
+  "raw_text": "t=i",
+  "latex": "t=i",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 5,
+  "bbox": [
+   306.59637451171875,
+   527.3171081542969,
+   348.00518798828125,
+   546.6488800048828
+  ],
+  "raw_text": "Bi,j(v) =∑j",
+  "latex": "B_{i},j(v) =\\sum^{j}",
+  "status": "accepted",
+  "det": 1.0,
+  "rec": 0.8,
+  "structure_kinds": [
+   "op",
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 5,
+  "bbox": [
+   338.6837463378906,
+   520.0941772460938,
+   345.8079833984375,
+   528.5643005371094
+  ],
+  "raw_text": "t=i",
+  "latex": "t=i",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 5,
+  "bbox": [
+   350.6455078125,
+   513.9856262207031,
+   376.9050598144531,
+   527.8268737792969
+  ],
+  "raw_text": "φmt,∕=j(vm∕=,nn)∈>V0",
+  "latex": "\\begin{pmatrix}v∕= & n \\\\ m & ,n\\end{pmatrix}",
+  "status": "accepted",
+  "det": 1.0,
+  "rec": 0.9,
+  "structure_kinds": [
+   "matrix",
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 6,
+  "bbox": [
+   53.574501037597656,
+   482.7019348144531,
+   92.06980895996094,
+   495.7330322265625
+  ],
+  "raw_text": "Emb(f) = σ",
+  "latex": "Emb(f) = \\sigma",
+  "status": "needs_review",
+  "det": 0.63,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 11,
+  "bbox": [
+   37.587398529052734,
+   315.85296630859375,
+   62.2054443359375,
+   328.8840637207031
+  ],
+  "raw_text": "EWS =",
+  "latex": "EWS =",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "A deep-learning-based approach for temporal transportation network dismantling.pdf",
+  "page": 11,
+  "bbox": [
+   124.3280029296875,
+   304.797119140625,
+   177.92626953125,
+   322.2117614746094
+  ],
+  "raw_text": "disscorei>∑",
+  "latex": "dis score_{i}>\\sum",
+  "status": "accepted",
+  "det": 1.0,
+  "rec": 0.8,
+  "structure_kinds": [
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 3,
+  "bbox": [
+   407.31549072265625,
+   652.4015502929688,
+   477.6194763183594,
+   676.8740234375
+  ],
+  "raw_text": "Callable functions withname + description  T = {τ1, τ2,..., τK}",
+  "latex": "Callable functions with name + description  T = \\{\\tau_{1}, \\tau_{2},..., \\tau_{K}\\}",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.8,
+  "structure_kinds": [
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 3,
+  "bbox": [
+   108.95208740234375,
+   593.2178039550781,
+   493.4519958496094,
+   603.5892944335938
+  ],
+  "raw_text": "n independent LLM calls → H0 = {h1,..., hn}. Each h:I → O is a solver that invokes tools from T—admitted only after smoke testing",
+  "latex": "\\sqrt{n}independent LLM calls \\to H_{0} = \\{h_{1},..., h_{n}\\}. Each h:I \\to O is a solver that invokes tools from T—admitted only after smoke testing",
+  "status": "accepted",
+  "det": 0.81,
+  "rec": 0.8,
+  "structure_kinds": [
+   "root",
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 7,
+  "bbox": [
+   308.7445068359375,
+   588.527587890625,
+   548.1265258789062,
+   605.9120941162109
+  ],
+  "raw_text": "01530Wall-clock time (min)456075",
+  "latex": null,
+  "status": "failed",
+  "det": 0.15,
+  "rec": 0.8,
+  "structure_kinds": [
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 8,
+  "bbox": [
+   464.03900146484375,
+   260.627197265625,
+   471.80615234375,
+   268.4727783203125
+  ],
+  "raw_text": "i=1",
+  "latex": "i=1",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 9,
+  "bbox": [
+   306.1416931152344,
+   672.7286682128906,
+   561.2822265625,
+   745.5144195556641
+  ],
+  "raw_text": "10: 11: 13: 14: 12: 9: forend forifend ifmax(ih∈𝒟𝒟if ∈𝒟𝒟i′(h𝒯t′i𝒪,(ERh tdoi′(𝒪> (hLLM′𝒪𝒪𝒯 Tmax, PEvaluateERthen, h′, ε𝒪 (h′, i𝒪⊳ ER (up to Nrep attempts)",
+  "latex": null,
+  "status": "failed",
+  "det": 0.35,
+  "rec": 0.8,
+  "structure_kinds": [
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 9,
+  "bbox": [
+   194.64700317382812,
+   690.9989929199219,
+   202.41415405273438,
+   698.844596862793
+  ],
+  "raw_text": "i=1",
+  "latex": "i=1",
+  "status": "needs_review",
+  "det": 0.55,
+  "rec": 0.5,
+  "structure_kinds": [
+   "row",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 9,
+  "bbox": [
+   383.8877868652344,
+   395.1091003417969,
+   426.34521484375,
+   412.0126037597656
+  ],
+  "raw_text": "ℋ⊆𝒞𝒞,|𝒞|=minn(f ∗",
+  "latex": "ℋ\\subseteq𝒞𝒞,|𝒞|=min_{n}(f ∗",
+  "status": "accepted",
+  "det": 0.88,
+  "rec": 0.8,
+  "structure_kinds": [
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ },
+ {
+  "paper": "s42256-026-01307-8.pdf",
+  "page": 9,
+  "bbox": [
+   396.93780517578125,
+   226.2901611328125,
+   427.9070129394531,
+   241.4453125
+  ],
+  "raw_text": "ℋ⊆𝒞𝒞,|𝒞|=minn",
+  "latex": "ℋ\\subseteq𝒞𝒞,|𝒞|=min_{n}",
+  "status": "accepted",
+  "det": 0.88,
+  "rec": 0.6,
+  "structure_kinds": [
+   "row",
+   "script",
+   "text"
+  ],
+  "reviewed": null,
+  "is_formula": null,
+  "expect_latex": null
+ }
+]

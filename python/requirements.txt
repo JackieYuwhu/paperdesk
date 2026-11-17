@@ -1,0 +1,8 @@
+# PaperDesk Python sidecar 依赖
+# 说明：应用**不自带 Python**，需用户/部署环境提供 Python 3.10+（开发机为 3.13）。
+# 版本锁定到已验证可用的组合，保证「全新环境安装后测试与构建通过」可复现。
+fastapi==0.141.1
+uvicorn==0.34.0
+pymupdf==1.27.2.3
+httpx==0.28.1
+pydantic==2.13.4

@@ -1,0 +1,12 @@
+# 本地起一个 GROBID 服务（可选，用于高质量的作者/引用抽取）
+# 用法：
+#   docker compose up -d
+#   set GROBID_URL=http://127.0.0.1:8070
+services:
+  grobid:
+    image: grobid/grobid:0.8.1-crf
+    ports:
+      - '8070:8070'
+    ulimits:
+      core: 0
+    init: true

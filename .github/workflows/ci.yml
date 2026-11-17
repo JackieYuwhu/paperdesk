@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install -r python/requirements.txt
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (main process)
+        run: npm run test:unit
+
+      - name: Test coords
+        run: npm run test:coords
+
+      - name: Test Python
+        run: npm run test:py
+
+      - name: Smoke test
+        run: npm run smoke

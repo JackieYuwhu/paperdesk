@@ -1,0 +1,27 @@
+node_modules/
+out/
+dist/
+data/
+*.log
+*.tsbuildinfo
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+samples/
+.shots/
+release/
+.vite/
+.dsh/
+
+# Local profiles, credentials, and private release bundles
+.tmp*/
+.pytest_cache/
+.opencode/
+.shots-modes/
+tmp*/
+.env
+.env.*
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
