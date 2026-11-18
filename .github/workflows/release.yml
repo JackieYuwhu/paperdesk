@@ -2,11 +2,13 @@ name: Release Windows
 
 on:
   workflow_dispatch:
-  # Bootstrap the first release when this workflow is added. Later releases
-  # can be started manually; an existing version is never overwritten.
+  # A versioned release note on main publishes that version after all checks.
+  # Existing versions are never overwritten.
   push:
     branches: [main]
-    paths: [.github/workflows/release.yml]
+    paths:
+      - .github/workflows/release.yml
+      - docs/RELEASE-v*.md
 
 permissions:
   contents: read
