@@ -134,7 +134,7 @@ interface DocEntry {
   destroy: (() => void) | null
 }
 const docCache = new Map<string, DocEntry>()
-const DOC_CACHE_MAX = 6
+const DOC_CACHE_MAX = 2
 
 function evictDocs(): void {
   if (docCache.size <= DOC_CACHE_MAX) return
@@ -173,10 +173,11 @@ function acquireDoc(
     .then((r) => {
       entry.doc = r.doc
       entry.destroy = r.destroy
+      if (!docCache.has(key)) r.destroy()
       return r.doc
     })
     .catch((e: unknown) => {
-      docCache.delete(key)
+      if (docCache.get(key) === entry) docCache.delete(key)
       throw e
     })
   docCache.set(key, entry)
@@ -729,7 +730,10 @@ export function PdfViewer({
   const handleTextLayerReady = useCallback(
     (pageIndex: number): void => {
       const pending = pendingFindRef.current
-      if (!pending || pending.page !== pageIndex + 1) return
+      if (!pending || pending.page !== pageIndex + 1) {
+        if (findQuery.trim()) applyFind(findQuery, { preferPage: page, scroll: false })
+        return
+      }
       // 用户已改查找词 / 已切文档：丢弃这次待定位请求，别把旧词塞回查找框
       if (externalFindQuery !== undefined && externalFindQuery.trim() !== pending.query.trim()) {
         pendingFindRef.current = null
@@ -742,7 +746,7 @@ export function PdfViewer({
       pendingFindRef.current = null
       applyFind(pending.query, { preferPage: pending.page, scroll: false })
     },
-    [applyFind, externalFindQuery]
+    [applyFind, externalFindQuery, findQuery, page]
   )
 
   // 公共工具栏驱动：下一处 / 上一处
@@ -842,6 +846,7 @@ export function PdfViewer({
       .figures(attachmentId)
       .then((rs) => {
         if (cancelled) return
+        figRegionsCache.current.clear()
         figRegionsCache.current.set(attachmentId, rs)
         setFigRegions(rs)
       })
@@ -869,6 +874,7 @@ export function PdfViewer({
       .modules(attachmentId)
       .then((d) => {
         if (cancelled) return
+        structuredCache.current.clear()
         structuredCache.current.set(attachmentId, d)
         setStructured(d && d.pageCount > 0 ? d : null)
       })
@@ -880,18 +886,18 @@ export function PdfViewer({
 
   // 2) 加载批注（译文模式下不加载）
   useEffect(() => {
-    if (readOnly) {
+    if (attachmentId == null) {
       setAnnotations([])
       return
     }
     let cancelled = false
-    void window.api.reader.listAnnotations(attachmentId).then((list) => {
+    void window.api.reader.listAnnotations(attachmentId, translationId).then((list) => {
       if (!cancelled) setAnnotations(list)
     })
     return () => {
       cancelled = true
     }
-  }, [attachmentId, readOnly])
+  }, [attachmentId, translationId, reloadKey])
 
   // 点击非弹层区域时关闭弹层（含点击正文：点击即取消划词，工具条随之消失）
   useEffect(() => {
@@ -1108,6 +1114,7 @@ export function PdfViewer({
       if (!selection) return
       const created = await window.api.reader.createAnnotation({
         attachmentId,
+        translationId,
         type,
         pageIndex: selection.pageIndex,
         rects: selection.rects,
@@ -1122,7 +1129,7 @@ export function PdfViewer({
       setNoteText('')
       window.getSelection()?.removeAllRanges()
     },
-    [selection, attachmentId]
+    [selection, attachmentId, translationId]
   )
 
   /** 划词「查找」：把选中文本填进查找框并在本文中查找 */
@@ -1399,7 +1406,8 @@ export function PdfViewer({
           scale={renderScale}
           liveScale={liveScale}
           autoFit={autoFit}
-          readOnly={readOnly}
+          readOnly={false}
+          searchQuery={findOwner ? findQuery : ''}
           annotations={annotations}
           containerRef={scrollRef}
           currentPage={page}
@@ -1455,23 +1463,6 @@ export function PdfViewer({
               {selection.text.length > 140 ? `${selection.text.slice(0, 140)}…` : selection.text}
             </div>
           )}
-          <div className="popup__row">
-            <label>高亮</label>
-            <div className="popup__swatches">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  className="swatch"
-                  style={{ background: c }}
-                  title="高亮"
-                  onClick={() => void createAnnotation('highlight', c)}
-                />
-              ))}
-            </div>
-            <button className="popup__quit" title="关闭" onClick={() => setSelectionSynced(null)}>
-              <Icon name="close" size={14} />
-            </button>
-          </div>
           <div className="popup__row">
             <label>下划线</label>
             <div className="popup__swatches">
@@ -1659,6 +1650,7 @@ export function PdfViewer({
 }
 
 interface ScrollPagesProps {
+  searchQuery?: string
   doc: PDFDocumentProxy
   numPages: number
   /** 实际渲染比例（防抖后的） */
@@ -1723,6 +1715,7 @@ interface ScrollPagesProps {
 
 /** 连续滚动阅读：所有页面纵向堆叠、懒渲染；页码导航通过滚动定位实现。 */
 function ScrollPages({
+  searchQuery = '',
   doc,
   numPages,
   scale,
@@ -1989,6 +1982,37 @@ function ScrollPages({
   const effLive = autoFit ? (layout?.fit ?? 1) : liveScale
   const zoomK = effRender > 0 ? Math.max(0.2, Math.min(5, effLive / effRender)) : 1
 
+  // Search needs text, not a full-document bitmap cache. Build missing text layers
+  // only on demand, sequentially, and stop immediately when the query/document changes.
+  useEffect(() => {
+    if (!searchQuery.trim() || !layout) return
+    let stopped = false
+    let activeLayer: InstanceType<typeof pdfjsLib.TextLayer> | null = null
+    const timer = window.setTimeout(() => void (async () => {
+      for (let i = 0; i < numPages && !stopped; i++) {
+        const target = containerRef.current?.querySelector<HTMLElement>(`[data-page="${i}"] [data-text]`)
+        if (!target || target.childNodes.length) continue
+        try {
+          const p = await doc.getPage(i + 1)
+          if (stopped) break
+          const viewport = p.getViewport({ scale: effRender })
+          const detached = document.createElement('div')
+          detached.style.setProperty('--total-scale-factor', String(viewport.scale))
+          activeLayer = new pdfjsLib.TextLayer({ textContentSource: p.streamTextContent(), container: detached, viewport })
+          await activeLayer.render()
+          if (stopped) break
+          if (!target.childNodes.length) {
+            target.style.setProperty('--total-scale-factor', String(viewport.scale))
+            target.replaceChildren(...Array.from(detached.childNodes))
+            textScaleRef.current.set(i, effRender)
+            onTextLayerReadyRef.current?.(i)
+          }
+        } catch { if (stopped) break }
+      }
+    })(), 200)
+    return () => { stopped = true; window.clearTimeout(timer); activeLayer?.cancel() }
+  }, [searchQuery, doc, numPages, effRender, layout, containerRef])
+
   // 只取「第一页」尺寸并计算适应宽度：**不要**在打开文档时 for 1..numPages 顺序 getPage。
   // 大文档 / 译文（内嵌 CJK 字体）解析全部页面要很久，期间没有 layout → 整页空白。
   // 现在第一页一就绪就上屏，其余页按第一页尺寸占位，渲染到真实页面时再修正高度。
@@ -2081,7 +2105,7 @@ function ScrollPages({
     }
 
     // 位图缓存预算（离屏缓冲）：超出后按 LRU 释放，避免长文档内存线性增长
-    const CACHE_LIMIT_BYTES = 160 * 1024 * 1024
+    const CACHE_LIMIT_BYTES = 48 * 1024 * 1024
 
     /**
      * 双缓冲提交：把离屏位图换成页面上的可见画布。
@@ -2117,6 +2141,7 @@ function ScrollPages({
       next.dataset.rendered = '1'
       if (prev) holder.replaceChild(next, prev)
       else holder.appendChild(next)
+      if (prev) { prev.width = 0; prev.height = 0 }
       // 这一页已出过图：CSS 用它把骨架动画换成静态纸面。之后无论重渲染还是内存回收，
       // 都不会再反复播放动画（快速跳页时反复出现/消失的动画本身就是「闪烁」）。
       host.dataset.ever = '1'
@@ -2385,7 +2410,7 @@ function ScrollPages({
      * 快速在多页之间循环跳动时，回到刚看过的那页就已经变成白纸 + 骨架动画 →
      * 看上去就是整片闪白。
      */
-    const RELEASE_LIMIT_BYTES = 384 * 1024 * 1024
+    const RELEASE_LIMIT_BYTES = 96 * 1024 * 1024
     let releasedOnce = false
     /** 滚动中推迟的回收：停稳后再补一次，避免「刚离开的页变空白 → 回看先白后图」 */
     let releaseTimer = 0
@@ -2414,7 +2439,7 @@ function ScrollPages({
       const cur = currentPageRef.current - 1
       const candidates: number[] = []
       for (let p = 0; p < numPages; p++) {
-        if (Math.abs(p - cur) <= 12 || visibleRef.current.has(p)) continue
+        if (Math.abs(p - cur) <= 2 || visibleRef.current.has(p)) continue
         const cv = c.querySelector<HTMLCanvasElement>(`[data-page="${p}"] canvas`)
         if (!cv || cv.dataset.rendered !== '1') continue
         candidates.push(p)
@@ -2534,40 +2559,12 @@ function ScrollPages({
       enqueue(cur0 - d * dir0)
     }
 
-    // 空闲补齐：手势期间不补齐（每次新一轮都会重置该定时器）；停稳后逐页补齐
-    // 「从未渲染过」的页，让全文查找 / 深链定位在未上屏的页面上也可用。
-    // 已有旧比例位图的离屏页不重渲染（滚动到时由 IO 按新比例渲染），避免缩放后的长尾 CPU。
-    let idleTimer = 0
-    const backfill = (): void => {
-      idleTimer = 0
-      if (gen.current !== myGen) return
-      // 用户还在翻页/滚动时不抢占渲染队列；停稳约 0.8s 后再补未渲染页。
-      if (Date.now() - lastScrollAtRef.current < 800) {
-        idleTimer = window.setTimeout(backfill, 350)
-        return
-      }
-      // 从「当前页」向两侧补齐，而不是从第 1 页顺序补：
-      // 用户快速往后翻时，更远的页也能尽快有一张位图兜底（跳页不再露白）。
-      const pending: number[] = []
-      for (let i = 0; i < numPages; i++) {
-        if (!everRenderedRef.current.has(i)) pending.push(i)
-      }
-      if (pending.length === 0) return
-      const cur = currentPageRef.current - 1
-      pending.sort((a, b) => Math.abs(a - cur) - Math.abs(b - cur))
-      const i = pending[0]
-      void renderPage(i).finally(() => {
-        if (gen.current === myGen) idleTimer = window.setTimeout(backfill, 40)
-      })
-    }
-    idleTimer = window.setTimeout(backfill, 150)
-
+    // Only viewport and nearby pages are rendered. Full-document search uses the text index.
     return () => {
       io.disconnect()
       ioViewport.disconnect()
       viewportRef.current.clear()
       visibleRef.current.clear()
-      window.clearTimeout(idleTimer)
       cancelInFlight()
     }
   }, [doc, layout?.fit, effRender, containerRef, numPages, dpr])
@@ -2622,13 +2619,13 @@ function ScrollPages({
             for (const r of rects) {
               const box = pdfRectToViewportRect(r, vp)
               const el = document.createElement('div')
-              el.className = `ann ann--${a.type}`
+              el.className = `ann ann--${a.type === 'highlight' ? 'underline' : a.type}`
               el.dataset.key = a.key
               el.style.left = `${box.left}px`
               el.style.top = `${box.top}px`
               el.style.width = `${box.width}px`
               el.style.height = `${box.height}px`
-              if (a.type === 'underline') el.style.borderBottomColor = a.color ?? NOTE_COLOR
+              if (a.type === 'underline' || a.type === 'highlight') el.style.borderBottomColor = resolveHighlight(a.color).hex
               else {
                 // 逐色高亮：颜色与不透明度都由色板给出，叠加时 multiply 只加深不糊字
                 const spec = resolveHighlight(a.color)

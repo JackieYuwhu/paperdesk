@@ -2546,10 +2546,14 @@ def _restore_formula_placeholders(
         before = translated[i] or ""
         if before == (f.get("raw") or ""):
             continue  # 跳过类型：本来就保留原文
-        missing = [k for k in range(len(items)) if ("⟦%d⟧" % k) not in before]
-        if missing and before.strip():
+        missing = [k for k in range(len(items)) if before.count("⟦%d⟧" % k) != 1]
+        if missing:
             dropped += 1
             missing_total += len(missing)
+            # Missing/repeated placeholders cannot be repaired by guessing where a symbol
+            # belongs. Leave the entire source paragraph intact and report the fallback.
+            translated[i] = f.get("raw") or ""
+            continue
         if any(str(v).startswith(_MATH_LOSSY) for v in items):
             # 公式结构还原不了：不假装还原成功。这里只记账并在整篇结束时告警；
             # 不退回原文——退回会让这块文字与矢量公式重叠，反而更糟。
@@ -2863,6 +2867,22 @@ def _split_coarse_paragraph(f: dict, body_size: float = 0.0) -> list[dict]:
 
 
 _SENT_SPLIT_RE = re.compile(r"(?<=[.!?。！？])(?![.!?。！？])\s*")
+_SENT_MARK_RE = re.compile(r"⟪PD-S(\d+)⟫")
+
+
+def _marked_sentences(text: str) -> tuple[str, list[str]]:
+    sentences = _split_sentences(text)
+    if not sentences or _SENT_MARK_RE.search(text):
+        return text, []
+    return " ".join(f"⟪PD-S{i}⟫{s}" for i, s in enumerate(sentences)), sentences
+
+
+def _unmark_sentences(text: str, count: int) -> tuple[str, list[str]]:
+    matches = list(_SENT_MARK_RE.finditer(text))
+    if count < 1 or [int(m.group(1)) for m in matches] != list(range(count)) or text[:matches[0].start()].strip():
+        return _SENT_MARK_RE.sub("", text).strip(), []
+    parts = [text[m.end():matches[i + 1].start() if i + 1 < len(matches) else len(text)].strip() for i, m in enumerate(matches)]
+    return " ".join(parts), parts if all(parts) else []
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -2870,7 +2890,11 @@ def _split_sentences(text: str) -> list[str]:
     t = (text or "").strip()
     if not t:
         return []
-    return [x.strip() for x in _SENT_SPLIT_RE.split(t) if x.strip()]
+    # Decimal points and common scientific abbreviations are not sentence boundaries.
+    protected = re.sub(r"(?<=\d)\.(?=\d)", "\ue100", t)
+    protected = re.sub(r"\b(?:e\.g|i\.e|Fig|Figs|Eq|Eqs|Dr|Prof|vs|et\s*al|No)\.",
+                       lambda m: m.group(0).replace(".", "\ue100"), protected, flags=re.I)
+    return [x.strip().replace("\ue100", ".") for x in _SENT_SPLIT_RE.split(protected) if x.strip()]
 
 
 def _norm_nospace(s: str) -> str:
@@ -2878,7 +2902,7 @@ def _norm_nospace(s: str) -> str:
 
 
 def _segment_pieces(
-    text: str, line_pairs: list[tuple[str, "fitz.Rect"]]
+    text: str, line_pairs: list[tuple[str, "fitz.Rect"]], sentence_parts: list[str] | None = None
 ) -> list[tuple[list[float], int, list[tuple[list[float], int]]]]:
     """按句子切分文本，返回 ``(并集矩形, 归一化字数, 行片段列表)``。
 
@@ -2897,7 +2921,9 @@ def _segment_pieces(
         starts.append(total)
         total += len(t)
     norm = _norm_nospace(text)
-    sents = _split_sentences(norm)
+    sents = [_norm_nospace(s) for s in sentence_parts] if sentence_parts else _split_sentences(norm)
+    if sentence_parts and "".join(sents) != norm:
+        return []
     out: list[tuple[list[float], int, list[tuple[list[float], int]]]] = []
     pos = 0
     for s in sents:
@@ -3260,6 +3286,7 @@ def simple_translate(
     layout: str = "reflow",
     # 用户自定义术语表（每行 `英文=中文`）；与自动抽取的术语合并，用户优先
     glossary: str | None = None,
+    terminology: str = "",
     # 是否自动抽取术语表（默认开）；关掉可省一次模型请求
     auto_glossary: bool = True,
     # 翻译时关闭模型「思考」（默认开：论文段落翻译不需要推理，开着会让单请求多等几十秒）
@@ -4076,6 +4103,7 @@ def simple_translate(
                 # 译文过长是「重叠/溢出」的主因：统一要求简洁，不扩写
                 + " Keep the translation concise and faithful; do not expand or add explanations."
                 + _gloss_line
+                + terminology
             )
 
         # 全局展开：所有组的全部块进入同一个线程池并行
@@ -4111,17 +4139,28 @@ def simple_translate(
             nonlocal req_total_s, req_count
             t0 = time.time()
             try:
-                return _openai_translate_many(
-                    [tin[i] for i in item["indices"]],
+                marked = [_marked_sentences(tin[i]) for i in item["indices"]]
+                values = _openai_translate_many(
+                    [text for text, _sentences in marked],
                     target_lang,
                     base_url,
                     api_key,
                     model,
                     headers,
-                    system=item["system"] or None,
+                    system=(item["system"] or "") + " Preserve every ⟪PD-Sn⟫ sentence marker exactly once in its original order. Translate each marked sentence using the full paragraph context, but do not merge or move text across markers. Never add these markers yourself.",
                     ids=[flat[i]["id"] for i in item["indices"]],
                     no_think=no_think,
                 )
+                cleaned = []
+                for idx, value, (_marked, source_parts) in zip(item["indices"], values, marked):
+                    if not source_parts:
+                        cleaned.append(value)
+                        continue
+                    text, parts = _unmark_sentences(value, len(source_parts))
+                    if parts:
+                        flat[idx]["translatedSentences"] = parts
+                    cleaned.append(text)
+                return cleaned
             finally:
                 req_total_s += time.time() - t0
                 req_count += 1
@@ -4686,11 +4725,13 @@ def simple_translate(
                         (t, fitz.Rect(rr))
                         for t, rr in zip(f.get("lines") or [], f.get("lineRects") or [])
                     ],
+                    _split_sentences(f.get("raw") or "") if f.get("translatedSentences") else None,
                 )
                 _src_info = [(rect, weight) for rect, weight, _ps in _src_detail]
                 acc["layout"].append(
                     {
                         "id": f.get("id"),
+                        "_sentenceParts": [_restore_math(s, f.get("math") or []) for s in f.get("translatedSentences") or []],
                         "page": f["pno"] + 1,
                         # 与阅读器选区/批注一致：PDF 坐标、**左下原点**
                         "src": [
@@ -4763,11 +4804,12 @@ def simple_translate(
                 _src_detail = _ent.pop("_srcDetail", [])
                 _src_info = [(rect, weight) for rect, weight, _ps in _src_detail]
                 _target_text = _ent.pop("_targetText", "")
+                _sentence_parts = _ent.pop("_sentenceParts", [])
                 _ent.pop("_box", None)
                 if abs(float(_ent.get("angle") or 0.0)) < 1.0:
                     _bx = fitz.Rect(_box)
                     _lines_in = [p for p in _lines if _bx.intersects(p[1])]
-                    _dst_detail = _segment_pieces(_target_text or "", _lines_in)
+                    _dst_detail = _segment_pieces(_target_text or "", _lines_in, _sentence_parts or None)
                     # 行文本校验：译文在框内被截断、或框里混进邻块的行时，句框会和
                     # 实际文字错位（高亮跳到别的句子）。宁可这次不写 segs（客户端
                     # 不高亮），也不写一份不可信的映射。
@@ -4786,7 +4828,18 @@ def simple_translate(
                                 ]
                                 for (x0, y0, x1, y1), _w in _dst_info
                             ]
-                        _pairs = _align_segments(_src_detail, _dst_detail)
+                        # Across languages, character fractions do not establish word meaning.
+                        # Keep a whole sentence's line pieces together when boundaries were
+                        # explicitly retained by the translator.
+                        if _sentence_parts and len(_src_detail) == len(_dst_detail):
+                            _pairs = [[s_rect, d_rect] for s, d in zip(_src_detail, _dst_detail)
+                                      for s_rect, _sw in s[2] for d_rect, _dw in d[2]]
+                        elif backend == "openai":
+                            _pairs = []  # unverified boundaries: paragraph mapping only
+                            _ent.pop("dstSegs", None)
+                            _ent.pop("srcSegs", None)
+                        else:
+                            _pairs = _align_segments(_src_detail, _dst_detail)
                         if _pairs:
                             _ent["segs"] = [
                                 [
@@ -4853,7 +4906,7 @@ def simple_translate(
     if formula_dropped:
         warnings.append(
             f"有 {formula_dropped} 处行内公式的占位符被模型丢弃（共 {formula_missing} 个符号），"
-            "译文里可能缺少符号，请对照原文"
+            "相关段落已保留原文，可使用重译本页或阅读 AI 解释"
         )
     if formula_unreliable:
         warnings.append(
@@ -5092,6 +5145,7 @@ def simple_translate(
                     mode=mode,
                     layout=layout,
                     glossary=_retry_gloss,
+                    terminology=terminology,
                     auto_glossary=False,
                     no_think=no_think,
                     verify=False,
@@ -5379,6 +5433,7 @@ def retranslate_page(
     mode: str = "fine",
     layout: str = "reflow",
     glossary: str | None = None,
+    terminology: str = "",
     auto_glossary: bool = True,
     no_think: bool = True,
     font_delta: float = DEFAULT_FONT_DELTA,
@@ -5401,6 +5456,8 @@ def retranslate_page(
         with tempfile.TemporaryDirectory(prefix=f"pd-page-{page_no}-") as tmp:
             one_src = os.path.join(tmp, "page-src.pdf")
             one_out = os.path.join(tmp, "page-out.pdf")
+            one_md = os.path.join(tmp, "page.md")
+            one_bi = os.path.join(tmp, "page.bilingual.md")
             one_doc = fitz.open()
             try:
                 one_doc.insert_pdf(src_doc, from_page=page_no - 1, to_page=page_no - 1)
@@ -5418,10 +5475,13 @@ def retranslate_page(
                 api_key,
                 model,
                 headers,
+                md_out=one_md,
+                bilingual_md_out=one_bi,
                 max_workers=max(1, min(int(max_workers or 2), 4)),
                 mode=mode,
                 layout=layout,
                 glossary=glossary,
+                terminology=terminology,
                 auto_glossary=auto_glossary,
                 no_think=no_think,
                 verify=False,
@@ -5482,6 +5542,8 @@ def retranslate_page(
                 "page": page_no,
                 "pageCount": total,
                 "mapUpdated": map_updated,
+                "pageMarkdown": Path(one_md).read_text("utf-8") if Path(one_md).exists() else None,
+                "pageBilingualMarkdown": Path(one_bi).read_text("utf-8") if Path(one_bi).exists() else None,
                 "warnings": list(result.get("warnings") or []),
             }
     finally:

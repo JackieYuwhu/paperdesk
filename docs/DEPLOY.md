@@ -1,10 +1,10 @@
 # 安装、部署与发布
 
-本文适用于 PaperDesk v0.1.0 的 Windows x64 版本。
+本文适用于 PaperDesk v0.1.1 的 Windows x64 版本。
 
 ## 安装程序
 
-从 [Releases](https://github.com/JackieYuwhu/paperdesk/releases/latest) 下载 `PaperDesk-0.1.0-x64-Setup.exe`，运行安装向导并选择安装目录。程序包不包含 Python 解释器。
+从 [Releases](https://github.com/JackieYuwhu/paperdesk/releases/latest) 下载 `PaperDesk-0.1.1-x64-Setup.exe`，运行安装向导并选择安装目录。程序包不包含 Python 解释器。
 
 PDF 解析等功能需要 Python 3.10+，建议使用已在发布流程中验证的 Python 3.13。安装 Python 后，在 PowerShell 中设置实际的程序安装目录并安装依赖：
 
@@ -34,7 +34,7 @@ $env:PAPERDESK_PYTHON = 'D:\Python313\python.exe'
 下载发布页中的 `SHA256SUMS.txt`，并将下面命令的输出与文件中的值比较：
 
 ```powershell
-Get-FileHash .\PaperDesk-0.1.0-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\PaperDesk-0.1.1-x64-Setup.exe -Algorithm SHA256
 ```
 
 当前安装包未进行发布者证书签名；SHA-256 用于检查文件是否与发布附件一致。

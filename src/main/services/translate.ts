@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { getDataDir, getDb } from '../db'
 import { generateKey } from '../db/keys'
@@ -17,6 +18,8 @@ import {
   pollTranslationStatus
 } from './translation-jobs'
 import { getModules } from './modules'
+import { listArticleTerms, prepareArticleTerms } from './article-glossary'
+import { glossaryInstructions } from '../../shared/glossary'
 import { exportDocument } from './export'
 import { skillsDir } from './skills'
 import { upsertSectionInItemNote } from './notes'
@@ -373,17 +376,60 @@ export async function runTranslation(
 
 /** 正在单页重译的译文 id，防止同一份译文并发改写同一 PDF。 */
 const pageRetranslating = new Set<number>()
+const pageAttachments = new Set<number>()
+
+/** Stage a new version; an unsuccessful retranslation never replaces the current version. */
+export async function retranslatePage(id: number, page: number): Promise<Translation> {
+  const old = getTranslationById(id)
+  if (!old || old.status !== 'done') throw new Error('只能重译已完成的译文')
+  if (pageAttachments.has(old.attachment_id)) throw new Error('本文已有页面正在重译')
+  pageAttachments.add(old.attachment_id)
+  const db = getDb(), dir = translatedDir(), key = generateKey()
+  const created: string[] = []
+  let stagedId: number | null = null
+  const copy = (rel: string | null, suffix: string): string | null => {
+    if (!rel || !existsSync(join(dir, rel))) return null
+    const next = `${key}${suffix}`
+    copyFileSync(join(dir, rel), join(dir, next)); created.push(next); return next
+  }
+  try {
+    const pdf = copy(old.path, '.pdf')
+    if (!pdf) throw new Error('译文 PDF 不存在')
+    copy(old.path.replace(/\.pdf$/i, '.map.json'), '.map.json')
+    const md = copy(old.md_path, '.md'), bi = copy(old.bilingual_md_path, '.bilingual.md')
+    const result = db.prepare(`INSERT INTO translations(key,attachment_id,lang,path,engine,backend,status,date_added,md_path,bilingual_md_path,qa)
+      VALUES(?,?,?,?,?,?,'retranslating',?,?,?,?)`).run(key, old.attachment_id, old.lang, pdf, old.engine, old.backend, new Date().toISOString(), md, bi, old.qa)
+    stagedId = Number(result.lastInsertRowid)
+    const next = await retranslateWorkingPage(stagedId, page)
+    db.transaction(() => {
+      db.prepare("UPDATE translations SET status='superseded' WHERE id=?").run(id)
+      db.prepare("UPDATE translations SET status='done' WHERE id=?").run(stagedId)
+      // Unchanged pages retain their annotations in both versions. The old page's annotations
+      // remain attached to its historical version, never guessed onto newly laid out text.
+      const anns = db.prepare("SELECT * FROM annotations WHERE attachment_id=? AND json_extract(position,'$.translationId')=? AND page_index<>?").all(old.attachment_id, id, Math.floor(page) - 1) as Array<Record<string, unknown>>
+      for (const a of anns) db.prepare(`INSERT INTO annotations(key,attachment_id,type,text,prefix,suffix,comment,color,page_index,position,sort_index,date_added,date_modified)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(generateKey(), old.attachment_id, a.type, a.text, a.prefix, a.suffix, a.comment, a.color, a.page_index,
+          JSON.stringify({ ...JSON.parse(String(a.position)), translationId: stagedId }), a.sort_index, a.date_added, a.date_modified)
+      if (next.md_path) db.prepare('INSERT INTO translations_fts(rowid,title,body) VALUES(?,?,?)').run(stagedId, `译文(${old.lang})`, readFileSync(join(dir, next.md_path), 'utf8'))
+    })()
+    return getTranslationById(stagedId) as Translation
+  } catch (e) {
+    if (stagedId != null) db.prepare('DELETE FROM translations WHERE id=?').run(stagedId)
+    for (const rel of created) rmSync(join(dir, rel), { force: true })
+    throw e
+  } finally { pageAttachments.delete(old.attachment_id) }
+}
 
 /**
  * 只重译某一页：侧车把该页单独翻译后替换回原译文 PDF，其余页保持不动。
  * 用于「整篇已翻译，但某页漏译/内容缺失」的定点修复。
  */
-export async function retranslatePage(id: number, page: number): Promise<Translation> {
+async function retranslateWorkingPage(id: number, page: number): Promise<Translation> {
   const row = getTranslationById(id)
   if (!row) throw new Error(`译文不存在: ${id}`)
   const pageNo = Math.floor(page)
   if (!Number.isFinite(pageNo) || pageNo < 1) throw new Error(`页码无效: ${page}`)
-  if (row.status !== 'done') throw new Error('只能重译已完成的译文')
+  if (row.status !== 'retranslating') throw new Error('缺少重译暂存版本')
   if (pageRetranslating.has(id)) throw new Error('这一页正在重译，请稍候')
   pageRetranslating.add(id)
   try {
@@ -422,6 +468,7 @@ export async function retranslatePage(id: number, page: number): Promise<Transla
         layout: isStrict ? 'strict' : 'reflow',
         maxWorkers: 2,
         glossary: effective('mt.glossary', 'PAPERDESK_MT_GLOSSARY', '') || undefined,
+        terminology: /^zh/i.test(row.lang) ? glossaryInstructions(listArticleTerms(att.id)) : '',
         autoGlossary: false,
         fontDelta: Math.max(
           0,
@@ -441,9 +488,18 @@ export async function retranslatePage(id: number, page: number): Promise<Transla
       }
       throw new Error(`单页重译失败: ${detail.slice(0, 300)}`)
     }
-    const result = (await res.json()) as { page?: number; warnings?: string[] }
+    const result = (await res.json()) as { page?: number; warnings?: string[]; pageMarkdown?: string; pageBilingualMarkdown?: string; qa?: { verification?: { pages?: Array<Record<string, unknown>> } } }
+    for (const [rel, content] of [[row.md_path, result.pageMarkdown], [row.bilingual_md_path, result.pageBilingualMarkdown]] as const) {
+      if (!rel || content == null) continue
+      const file = join(translatedDir(), rel), text = readFileSync(file, 'utf8')
+      const marker = `<!-- 第 ${pageNo} 页 -->`
+      const start = text.indexOf(marker)
+      const next = start < 0 ? -1 : text.indexOf('<!-- 第 ', start + marker.length)
+      const pageText = content.replace(/<!-- 第 1 页 -->/g, marker).trim() + '\n\n'
+      writeFileSync(file, start < 0 ? text + '\n\n' + pageText : text.slice(0, start) + pageText + (next < 0 ? '' : text.slice(next)), 'utf8')
+    }
 
-    // 把这一页标记为「已重译」，同时从失败页列表移除；整篇验收摘要随之更新。
+    // Use the new page's actual layout verdict; completing a request alone is not a pass.
     try {
       if (row.qa) {
         const qa = JSON.parse(row.qa) as {
@@ -458,12 +514,11 @@ export async function retranslatePage(id: number, page: number): Promise<Transla
         if (v) {
           const pages = Array.isArray(v.pages) ? v.pages : []
           const hit = pages.find((p) => Number(p.page) === pageNo)
+          const verdict = result.qa?.verification?.pages?.[0] ?? { ok: false, status: 'needs_review', reason: '手动重译，待核对' }
           if (hit) {
-            hit.ok = true
-            hit.status = 'retranslated'
-            hit.reason = '手动重译'
+            Object.assign(hit, verdict, { page: pageNo })
           } else {
-            pages.push({ page: pageNo, ok: true, status: 'retranslated', reason: '手动重译' })
+            pages.push({ ...verdict, page: pageNo })
           }
           v.pages = pages
           v.failedPages = pages
@@ -583,7 +638,9 @@ async function runTranslationJob(
   } catch {
     /* 文件不可读时不做复用 */
   }
-  const reuseSig = { backend, model: model ?? '', fingerprint, engineKey, layout }
+  const termsSignature = glossaryInstructions(listArticleTerms(att.id)) + effective('mt.glossary', 'PAPERDESK_MT_GLOSSARY', '')
+  const reuseSig = { backend, model: model ?? '', fingerprint, engineKey, layout,
+    terminologyHash: termsSignature ? createHash('sha256').update(termsSignature).digest('hex') : '' }
 
   // 默认复用已有译文，但必须核对：同引擎/模式、同后端与模型、源文件未变；
   // mock/none 不得冒充真实模型结果。force 始终跳过。
@@ -618,7 +675,7 @@ async function runTranslationJob(
   // 默认 32（上限 32），其它端点默认 24（更保守，避免 429）。
   // 可用 mt.workers / PAPERDESK_MT_WORKERS 覆盖，最终仍夹到 1~32。
   const isOC = isOpenCode(baseUrl)
-  const defaultWorkers = isOC ? '32' : '24'
+  const defaultWorkers = '4'
   const workers = Number(effective('mt.workers', 'PAPERDESK_MT_WORKERS', defaultWorkers)) || Number(defaultWorkers)
   const effWorkers = Math.max(1, Math.min(32, workers))
   // 该网关是**延迟主导**：单请求耗时随「段数」增长远快于线性（实测 4 段 42s、
@@ -645,8 +702,15 @@ async function runTranslationJob(
 
   // ---- 模块化：翻译前先拿到结构化模块，只翻译正文（图/表/公式/参考文献不译）----
   let skipRects: Record<string, number[][]> | undefined
+  let articleTerms = listArticleTerms(att.id)
   try {
     const mods = await getModules(att.id)
+    if (autoGlossary && backend === 'openai' && /^zh/i.test(lang)) {
+      onProgress?.({ stage: 'starting', message: '提取本文术语并查找参考译名…' })
+      try {
+        articleTerms = await prepareArticleTerms(att.id, mods.modules.filter((m) => m.type !== 'reference').map((m) => m.text).join('\n'), () => translationJobs.isCancelled(opts.requestId))
+      } catch (e) { console.warn('[glossary] extraction unavailable:', e instanceof Error ? e.message : String(e)) }
+    }
     if (mods.pageCount > 0 && mods.modules.length) {
       const SKIP = new Set(['figure', 'table', 'equation', 'reference'])
       const acc: Record<string, number[][]> = {}
@@ -673,6 +737,8 @@ async function runTranslationJob(
   } catch {
     /* 模块不可用：退回启发式（不影响翻译） */
   }
+  const finalTerms = glossaryInstructions(articleTerms) + glossary
+  reuseSig.terminologyHash = finalTerms ? createHash('sha256').update(finalTerms).digest('hex') : ''
 
   /** 任务失败/被杀时清掉可能写了一半的 PDF（避免 0 字节文件被当成译文） */
   const cleanupPartial = (): void => {
@@ -709,7 +775,8 @@ async function runTranslationJob(
       maxWorkers: effWorkers,
       batchSize,
       glossary: glossary || undefined,
-      autoGlossary,
+      terminology: /^zh/i.test(lang) ? glossaryInstructions(articleTerms) : '',
+      autoGlossary: autoGlossary && articleTerms.length === 0,
       noThink,
       fontDelta: effFontDelta,
       skipRects
@@ -736,7 +803,8 @@ async function runTranslationJob(
     // 记录**实际执行**的引擎：pdf2zh 失败回退到内置引擎后，
     // 不能仍把它标成 pdf2zh（否则下次请求 pdf2zh 会误复用这份回退结果）。
     const actualEngine = data.engine && data.engine !== 'pdf2zh' ? data.engine : engine
-    const actualKey = mode === 'coarse' ? `${actualEngine}:coarse` : actualEngine
+    const actualBase = layout === 'strict' ? `${actualEngine}:strict` : actualEngine
+    const actualKey = (mode === 'coarse' ? `${actualBase}:coarse` : actualBase) + (effFontDelta > 0 ? `:f${effFontDelta}` : '')
     if (actualEngine !== engine) {
       data.warnings = [
         ...(data.warnings ?? []),

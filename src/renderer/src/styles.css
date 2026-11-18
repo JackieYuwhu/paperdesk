@@ -4833,7 +4833,7 @@ body.resizing {
 .funcbar, .funcbar .ribbon__row { flex-wrap: wrap; overflow-x: visible; }
 
 /* 对照：每个窗格顶部的小标题条（右侧窗格带「PDF 版式 / 结构化文本」切换） */
-.compare__bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 2px 10px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-panel); }
+.compare__bar { flex: 0 0 36px; height:36px; box-sizing:border-box; display: flex; align-items: center; gap: 8px; padding: 2px 10px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-panel); }
 .compare__bar-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compare__mode { flex: 0 0 auto; }
 .compare__mode button { padding: 1px 8px; font-size: 11px; }
@@ -8193,8 +8193,8 @@ button, input, select, textarea { font-family: var(--font-ui); }
 .desk-content[data-workspace='library']:not([data-left-view='search'])>.sidebar .sidebar__split-pane--list { display:none; }
 .desk-content[data-workspace='library']:not([data-left-view='search']) .sidebar__split-pane--groups { flex:1; height:auto!important; }
 .desk-content[data-workspace='library'] .sidebar__splitter { display:none; }
-.desk-content[data-workspace='reader'][data-tool]:not([data-tool=''])>.leftpanels { grid-column:3; grid-row:1; border-left:1px solid var(--border); }
-.desk-content[data-workspace='reader'][data-tool]:not([data-tool=''])>.main { grid-column:1; grid-row:1; }
+.desk-content[data-workspace='reader'][data-tool]:not([data-tool=''])>.leftpanels { grid-column:1; grid-row:1; border-right:1px solid var(--border); }
+.desk-content[data-workspace='reader'][data-tool]:not([data-tool=''])>.main { grid-column:3; grid-row:1; }
 .desk-content[data-workspace='reader'][data-tool]:not([data-tool=''])>.splitter { grid-column:2; grid-row:1; }
 .desk-content[data-workspace='research']>.main, .desk-content[data-workspace='tasks']>.main,
 .desk-content[data-workspace='research']>.splitter, .desk-content[data-workspace='tasks']>.splitter,
@@ -8336,6 +8336,21 @@ html[data-density='compact'] .resume-paper { padding:14px 18px; margin-bottom:18
 @media(max-width:1150px){.library-table__head,.library-table__row{grid-template-columns:minmax(0,1fr) 45px 86px}}
 
 .desk-content[data-workspace='library']:not([data-left-view='search'])>.sidebar>.sidebar__search { display:none; }
-.desk-content[data-workspace='library'][data-left-view='detail']>.detail-panel { grid-column:3; grid-row:1; border-left:1px solid var(--border); background:var(--bg-panel); }
-.desk-content[data-workspace='library'][data-left-view='detail']>.main { grid-column:1; grid-row:1; }
+.desk-content[data-workspace='library'][data-left-view='detail']>.detail-panel { grid-column:1; grid-row:1; border-right:1px solid var(--border); background:var(--bg-panel); }
+.desk-content[data-workspace='library'][data-left-view='detail']>.main { grid-column:3; grid-row:1; }
 .desk-content[data-workspace='library'][data-left-view='detail']>.splitter { grid-column:2; grid-row:1; }
+
+/* Reading assistant remains modeless and independent from the left tools. */
+.reading-ai-launch { position:fixed; right:26px; bottom:46px; z-index:70; border-radius:22px; padding:10px 18px; background:var(--accent); color:white; box-shadow:0 3px 16px #0003; }
+.reading-assistant { position:fixed; z-index:100; width:460px; height:620px; max-width:calc(100vw - 16px); max-height:calc(100vh - 110px); min-width:320px; min-height:200px; resize:both; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:var(--bg-panel); box-shadow:0 12px 48px #0004; display:flex; flex-direction:column; }
+.reading-assistant>header { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:move; touch-action:none; border-bottom:1px solid var(--border); }
+.reading-assistant>header>span { flex:1; }
+.reading-assistant__body { flex:1; min-height:0; display:flex; flex-direction:column; }
+.reading-assistant__body[hidden] { display:none; }
+.reading-assistant__body>.panel { flex:1; min-height:0; }
+.reading-assistant--min { height:44px!important; min-height:44px; resize:none; }
+
+.glossary-panel { gap:10px; padding:16px; overflow:auto; }
+.glossary-panel form { display:flex; flex-direction:column; gap:8px; }
+.glossary-panel article { padding:12px 0; border-top:1px solid var(--border); }
+.glossary-panel article p { margin:6px 0; }

@@ -73,8 +73,7 @@ function segPairs(block: TranslationMapBlock, dir: 'src2dst' | 'dst2src'): SegPa
  * 对照视图「选区 → 另一侧高亮」的纯函数映射（双向）。
  *
  * 规则：
- * 1. 没有 `sel` → `null`；**完全没有 map**（旧译文没有 `.map.json`）→ 原样回声，
- *    保持「同页同矩形近似」的旧行为。
+ * 1. 没有 `sel` → `null`；没有 map 时不猜测另一侧的位置。
  * 2. 有 map：按**选区落进块的比例**（recall）挑块，recall 相同时选 `from` 矩形
  *    更小的块（标题/图注不被更大的正文块抢走）。
  * 3. 块内按句级片段打分（selCov × fragCov），命中条件为「选区大部分落在该片段内」
@@ -89,7 +88,7 @@ export function mapSelectionRects(
   dir: 'src2dst' | 'dst2src'
 ): SelectionRects | null {
   if (!sel) return null
-  if (!map?.blocks?.length) return sel
+  if (!map?.blocks?.length) return { page: sel.page, rects: [] }
   const fromKey = dir === 'src2dst' ? 'src' : 'dst'
   const toKey = dir === 'src2dst' ? 'dst' : 'src'
   const out: SelectionRect[] = []

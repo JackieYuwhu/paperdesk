@@ -100,6 +100,7 @@ class TranslateRequest(BaseModel):
     layout: str = "reflow"
     # 术语表：每行 `英文=中文`（用户自定义，优先于自动抽取）
     glossary: str | None = None
+    terminology: str = ""
     # 是否自动从摘要/正文抽取术语表（会多一次短请求，可关闭）
     autoGlossary: bool = True
     # 翻译时关闭模型「思考」（默认开：论文段落翻译不需要推理，开着会白等几十秒）
@@ -634,6 +635,7 @@ def translate(req: TranslateRequest) -> dict:
                 mode=req.mode,
                 layout=req.layout,
                 glossary=req.glossary,
+                terminology=req.terminology,
                 auto_glossary=req.autoGlossary,
                 no_think=req.noThink,
                 font_delta=float(req.fontDelta),
@@ -660,6 +662,7 @@ def translate(req: TranslateRequest) -> dict:
                 mode=req.mode,
                 layout=req.layout,
                 glossary=req.glossary,
+                terminology=req.terminology,
                 auto_glossary=req.autoGlossary,
                 no_think=req.noThink,
                 font_delta=float(req.fontDelta),
@@ -741,6 +744,7 @@ def _run_translate_job(job_id: str, req: TranslateRequest) -> None:
                 mode=req.mode,
                 layout=req.layout,
                 glossary=req.glossary,
+                terminology=req.terminology,
                 auto_glossary=req.autoGlossary,
                 no_think=req.noThink,
                 font_delta=float(req.fontDelta),
@@ -773,6 +777,7 @@ def _run_translate_job(job_id: str, req: TranslateRequest) -> None:
                 mode=req.mode,
                 layout=req.layout,
                 glossary=req.glossary,
+                terminology=req.terminology,
                 auto_glossary=req.autoGlossary,
                 no_think=req.noThink,
                 font_delta=float(req.fontDelta),
@@ -805,6 +810,7 @@ def translate_page(req: TranslatePageRequest) -> dict:
         mode=req.mode,
         layout=req.layout,
         glossary=req.glossary,
+                terminology=req.terminology,
         auto_glossary=req.autoGlossary,
         no_think=req.noThink,
         font_delta=float(req.fontDelta),

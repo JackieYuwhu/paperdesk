@@ -9,6 +9,7 @@ export interface ReuseSignature {
   engineKey: string
   /** 版式：reflow / strict；不同版式不能互相复用 */
   layout?: 'reflow' | 'strict'
+  terminologyHash?: string
 }
 
 export interface ReusableTranslationRow {
@@ -52,6 +53,7 @@ export function canReuseTranslation(
     stored.backend === sig.backend &&
     (stored.model ?? '') === sig.model &&
     stored.fingerprint === sig.fingerprint &&
+    (stored.terminologyHash ?? '') === (sig.terminologyHash ?? '') &&
     (stored.layout ?? 'reflow') === (sig.layout ?? 'reflow')
   )
 }

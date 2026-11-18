@@ -81,11 +81,25 @@ export function usePanels(onUserAdjust?: () => void): {
   selectTab: (id: string) => void
   toggleLeft: (v: 'library' | 'toc' | 'search') => void
 } {
-  const [rightTab, setRightTab] = useState<string>(PANELS[0]?.id ?? 'notes')
+  const [rightTab, setRightTab] = useState<string>(() => {
+    const saved = localStorage.getItem('paperdesk.ui.lastPanel')
+    return PANELS.some((p) => p.id === saved && p.id !== 'ai') ? saved! : PANELS[0]?.id ?? 'notes'
+  })
   const [activeGroup, setActiveGroup] = useState<string>(PANELS[0]?.group ?? 'read')
   const [visited, setVisited] = useState<Set<string>>(() => new Set([PANELS[0]?.id ?? 'notes']))
   const [leftView, setLeftView] = useState<LeftView>('library')
   const [sbCollapsed, setSbCollapsed] = useState(false)
+  // Actual function history; collapsing/expanding does not change its top entry.
+  useEffect(() => {
+    if (leftView == null) return
+    const entry = leftView === 'panel' ? `panel:${rightTab}` : leftView
+    try {
+      const parsed = JSON.parse(localStorage.getItem('paperdesk.ui.panelHistory') ?? '[]')
+      const history = Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string' && x !== entry) : []
+      localStorage.setItem('paperdesk.ui.panelHistory', JSON.stringify([...history, entry].slice(-16)))
+      localStorage.setItem('paperdesk.ui.lastPanel', rightTab)
+    } catch { /* UI memory is optional. */ }
+  }, [leftView, rightTab])
 
   const selectTab = useCallback((id: string): void => {
     setRightTab(id)

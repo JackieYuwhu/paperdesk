@@ -30,7 +30,7 @@ async function run() {
   let ws
   try {
     let page
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 300; i++) {
       try { page = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((p) => p.type === 'page') } catch {}
       if (page) break
       await sleep(150)
@@ -58,7 +58,7 @@ async function run() {
       return r.result?.value
     }
     const wait = async (expression, label) => {
-      for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await sleep(120) }
+      for (let i = 0; i < 300; i++) { if (await evaluate(`(async()=>(${expression}))()`)) return; await sleep(120) }
       throw new Error(`Timed out: ${label}`)
     }
     const click = (testid) => evaluate(`document.querySelector('[data-testid="${testid}"]')?.click()`)
@@ -88,7 +88,7 @@ async function run() {
     await shot('01-library')
     await evaluate("document.querySelector('.paper-actions button').click()")
     await wait("!!document.querySelector('[data-testid=item-detail]')", 'detail drawer')
-    assert.equal(await evaluate("(()=>{const d=document.querySelector('[data-testid=item-detail]').getBoundingClientRect(),m=document.querySelector('.main').getBoundingClientRect();return d.x>m.x})()"), true, 'detail on right')
+    assert.equal(await evaluate("(()=>{const d=document.querySelector('[data-testid=item-detail]').getBoundingClientRect(),m=document.querySelector('.main').getBoundingClientRect();return d.x<m.x})()"), true, 'detail on left')
     await click('workspace-library')
     await evaluate("[...document.querySelectorAll('.library-controls button')].find(b=>b.textContent==='全文检索').click()")
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.sidebar__split-pane--list')).display!=='none'"), true, 'full-text search results visible')
@@ -105,9 +105,55 @@ async function run() {
     assert.equal(await evaluate("document.querySelector('[data-testid=toolbar-page-label]').textContent.trim().startsWith('2')"), true, 'page position preserved')
     await click('panel-tab-ai')
     await wait("!!document.querySelector('.ai')", 'AI side panel')
-    const geometry = await evaluate("(()=>{const p=document.querySelector('.leftpanels').getBoundingClientRect(),m=document.querySelector('.main').getBoundingClientRect();return {panel:p.x,main:m.x,width:m.width}})()")
-    assert(geometry.panel > geometry.main && geometry.width > 350, 'AI is on right of readable PDF')
+    const geometry = await evaluate("(()=>{const p=document.querySelector('[data-testid=reading-assistant]').getBoundingClientRect(),m=document.querySelector('.main').getBoundingClientRect();return {panel:p.x,main:m.x,width:m.width}})()")
+    assert(geometry.width > 350, 'modeless AI leaves PDF readable')
+    assert.equal(await evaluate("document.querySelector('[data-testid=reading-assistant]').getAttribute('aria-modal')"), null)
+    await evaluate("document.querySelector('[aria-label=关闭助手]').click()")
+    await click('panel-tab-glossary')
+    await wait("!!document.querySelector('[data-testid=article-glossary]')", 'glossary left panel')
+    assert.equal(await evaluate("(()=>{const p=document.querySelector('.leftpanels').getBoundingClientRect(),m=document.querySelector('.main').getBoundingClientRect();return p.x<m.x})()"), true, 'glossary on left')
     await shot('03-reader-ai')
+    await evaluate(`(async()=> window.__readingAttachment = (await window.api.attachments.listByItem(${id}))[0].id)()`)
+    const glossary = await evaluate(`(async()=>{
+      const attachmentId=window.__readingAttachment;
+      await window.api.translate.saveTerm({attachmentId,term:'pool',sense:'候选集合',translation:'候选池',context:'candidate pool',locked:true});
+      return window.api.translate.saveTerm({attachmentId,term:'pool',sense:'水域',translation:'水池',context:'swimming pool',locked:true});
+    })()`)
+    assert.equal(glossary.length, 2, 'same spelling supports two senses')
+    assert.equal(glossary.every(t=>t.locked), true)
+    await click('panel-collapse')
+    assert.equal(await evaluate("document.querySelector('.side-strip__label').textContent"), '词汇库')
+    await click('sb-expand')
+    assert.equal(await evaluate("document.querySelector('.leftpanels__title').textContent.trim()"), '词汇库')
+    await click('layout-focus')
+    assert.equal(await evaluate("document.querySelector('.desk-shell').dataset.workspace"), 'reader', 'focus never changes workspace')
+    assert.equal(await evaluate("document.querySelector('[data-testid=toolbar-page-label]').textContent.trim().startsWith('2')"), true, 'focus retains page')
+    await evaluate("[...document.querySelectorAll('.desk-header button')].find(b=>b.textContent==='退出专注').click()")
+    await click('panel-tab-translate')
+    await wait("!!document.querySelector('[data-testid=translate-run]')", 'translation panel loaded')
+    await click('translate-run')
+    await wait("!!(await window.api.translate.get(window.__readingAttachment,'zh'))?.path", 'mock translation completed')
+    await wait("!document.querySelector('[data-testid=view-bilingual]').disabled", 'bilingual enabled')
+    await click('view-bilingual')
+    await wait("!!document.querySelector('[data-testid=compare-pane-translation] canvas[data-rendered=\"1\"]')", 'translated PDF')
+    await evaluate("document.querySelector('[data-testid=toolbar-page]').value='2'; document.querySelector('[data-testid=toolbar-page-next]').click()")
+    const oldTranslation = await evaluate("window.api.translate.get(window.__readingAttachment,'zh')")
+    const annotationResult = await evaluate(`(async()=>{
+      const attachmentId=window.__readingAttachment, translationId=${oldTranslation.id};
+      await window.api.reader.createAnnotation({attachmentId,translationId,type:'underline',pageIndex:1,rects:[[60,680,180,700]],text:'中文标注',color:'#2563eb'});
+      return {original:await window.api.reader.listAnnotations(attachmentId),translated:await window.api.reader.listAnnotations(attachmentId,translationId)};
+    })()`)
+    assert.equal(annotationResult.original.length, 0, 'translated annotations do not leak into source')
+    assert.equal(annotationResult.translated.length, 1)
+    await click('toolbar-retranslate-page')
+    await wait(`(await window.api.translate.get(window.__readingAttachment,'zh'))?.id !== ${oldTranslation.id}`, 'page retranslation creates version')
+    const nextTranslation = await evaluate("window.api.translate.get(window.__readingAttachment,'zh')")
+    assert.equal((await evaluate(`window.api.translate.getById(${oldTranslation.id})`)).status, 'superseded')
+    assert.equal((await evaluate(`window.api.reader.listAnnotations(window.__readingAttachment,${oldTranslation.id})`)).length, 1, 'old annotations remain with historical version')
+    const failedPage = await evaluate(`window.api.translate.retranslatePage(${nextTranslation.id},999).then(()=>false,()=>true)`)
+    assert.equal(failedPage, true)
+    assert.equal((await evaluate("window.api.translate.get(window.__readingAttachment,'zh')")).id, nextTranslation.id, 'failed page keeps current version')
+    await shot('03b-bilingual-retranslated')
     await evaluate("document.querySelector('.reader-more').click()")
     assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-testid=toolbar-page-edit]')).display!=='none'"), true, 'page editor remains accessible')
     await evaluate("document.querySelector('.reader-more').click()")
@@ -130,10 +176,30 @@ async function run() {
     await evaluate("document.querySelector('.desk-header>button[aria-label=\"切换明暗主题\"]').click()")
     await wait("document.documentElement.dataset.theme==='dark'", 'dark theme')
     await shot('08-dark-library')
+    // Long-document regression: idle time must not allocate every page's bitmap.
+    const longPdf = path.join(data, 'memory.pdf')
+    const made = require('node:child_process').spawnSync('python', ['-c', "import fitz,sys; d=fitz.open(); [(lambda p,i: p.insert_text((60,100), 'UniqueMemoryNeedle' if i==63 else 'Memory fixture page '+str(i+1)))(d.new_page(),i) for i in range(64)]; d.save(sys.argv[1]); d.close()", longPdf], { windowsHide:true, encoding:'utf8' })
+    assert.equal(made.status, 0, made.stderr)
+    const memoryItem = await evaluate("window.api.library.addMetadata({title:'Memory reading fixture',year:2026}).then(x=>x.id)")
+    const memoryDb = new DatabaseSync(path.join(data, 'library.sqlite'))
+    memoryDb.prepare('INSERT INTO attachments(key,item_id,path,filename,content_type,size,page_count,date_added) VALUES(?,?,?,?,?,?,?,?)').run('MEMORY01',memoryItem,'memory.pdf','memory.pdf','application/pdf',fs.statSync(longPdf).size,64,new Date().toISOString())
+    memoryDb.close()
+    await evaluate(`window.api.library.setGroup(${memoryItem},'验收')`)
+    await wait("[...document.querySelectorAll('.paper-title')].some(x=>x.textContent.includes('Memory reading fixture'))", 'memory paper in library')
+    await evaluate("[...document.querySelectorAll('.paper-title')].find(x=>x.textContent.includes('Memory reading fixture')).click()")
+    await wait("!!document.querySelector('canvas[data-rendered=\"1\"]')", 'long PDF visible')
+    await sleep(2000)
+    const memory = await evaluate("({readers:document.querySelectorAll('.reader').length, rendered:document.querySelectorAll('canvas[data-rendered=\"1\"]').length,canvasBytes:[...document.querySelectorAll('.reader canvas')].reduce((n,c)=>n+c.width*c.height*4,0)})")
+    assert.equal(memory.readers,1,'only active reader mounted')
+    assert(memory.rendered<20 && memory.canvasBytes<110*1024*1024,'64-page document stays within visible bitmap budget')
+    await evaluate("(()=>{const e=document.querySelector('[data-testid=find-input]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'UniqueMemoryNeedle');e.dispatchEvent(new Event('input',{bubbles:true}))})()")
+    await wait("document.querySelectorAll('.textLayer span').length>30", 'search builds text without full bitmaps')
+    await wait("[...document.querySelectorAll('.textLayer span')].some(e=>e.textContent.includes('UniqueMemoryNeedle'))", 'search finds never-rendered last page')
+    await shot('09-long-document')
     assert.deepEqual(errors, [], 'no unhandled renderer errors')
     const marks = await evaluate("performance.getEntriesByType('mark').map(m=>({name:m.name,ms:Math.round(m.startTime)}))")
-    fs.writeFileSync(path.join(shots, 'verification.json'), JSON.stringify({ firstReadyMs, marks, geometry, checks: 'WORKSPACE_UI_OK', profile: dir }, null, 2))
-    console.log('WORKSPACE_UI_OK', JSON.stringify({ firstReadyMs, marks, geometry, shots }))
+    fs.writeFileSync(path.join(shots, 'verification.json'), JSON.stringify({ firstReadyMs, marks, geometry, memory, checks: 'WORKSPACE_UI_OK', profile: dir }, null, 2))
+    console.log('WORKSPACE_UI_OK', JSON.stringify({ firstReadyMs, marks, geometry, memory, shots }))
   } finally {
     if (ws) ws.close()
     child.kill()

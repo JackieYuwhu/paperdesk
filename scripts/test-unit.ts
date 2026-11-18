@@ -4398,8 +4398,8 @@ function pd26SelectionMapTests(): void {
   check('PD26：没有选区 → null', mapSelectionRects(mapSegs, null, 'src2dst') === null)
   const k = go(null, [R(10, 10, 20, 20)], 'src2dst')
   check(
-    'PD26：旧译文没有 map → 原样回声（保持同页近似旧行为）',
-    keys(k).length === 1 && keys(k)[0] === key(R(10, 10, 20, 20)),
+    'PD26：旧译文没有 map → 不猜测另一侧的位置',
+    keys(k).length === 0,
     JSON.stringify(keys(k))
   )
   const l = go(mapSegs, [sL1], 'src2dst', 2)

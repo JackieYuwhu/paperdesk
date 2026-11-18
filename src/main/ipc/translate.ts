@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { CH, EVT } from '../../shared/channels'
+import { listArticleTerms, saveArticleTerm, removeArticleTerm, prepareArticleTerms } from '../services/article-glossary'
+import { getModules } from '../services/modules'
 import {
   archiveAll,
   archiveQaToNote,
@@ -47,6 +49,13 @@ import type {
 } from '../../shared/types'
 
 export function registerTranslateHandlers(): void {
+  ipcMain.handle(CH.translate.glossary, (_e, id: number) => listArticleTerms(id))
+  ipcMain.handle(CH.translate.saveTerm, (_e, input) => saveArticleTerm(input))
+  ipcMain.handle(CH.translate.removeTerm, (_e, attachmentId: number, id: number) => removeArticleTerm(attachmentId, id))
+  ipcMain.handle(CH.translate.prepareGlossary, async (_e, id: number) => {
+    const doc = await getModules(id)
+    return prepareArticleTerms(id, doc.modules.filter((m) => m.type !== 'reference').map((m) => m.text).join('\n'))
+  })
   ipcMain.handle(
     CH.translate.run,
     (event: IpcMainInvokeEvent, attachmentId: number, opts?: TranslateOptions): Promise<Translation> => {

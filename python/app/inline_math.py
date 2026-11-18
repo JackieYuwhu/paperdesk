@@ -86,7 +86,6 @@ def to_unicode_math(text: str) -> str:
     s = text
     s = re.sub(r"\\frac\{([^{}]*)\}\{([^{}]*)\}", r"(\1)⁄(\2)", s)
     s = re.sub(r"\\([a-zA-Z]+)", lambda m: GREEK.get(m.group(1)) or OPS.get(m.group(1)) or m.group(0), s)
-    s = s.replace("{", "").replace("}", "")
     s = re.sub(r"([\^_])(?:\{([^{}]*)\}|(\w))", _sup_sub_unicode, s)
     return s
 
@@ -130,7 +129,6 @@ def inline_math_html(text: str) -> str:
     )
     # \mathrm{x} / \text{x} → x
     s = re.sub(r"\\(?:mathrm|text|mathbf|mathit)\{([^{}]*)\}", r"\1", s)
-    s = s.replace("{", "").replace("}", "")
     # 上下标：多字符（x^{ij}）与单字符（x^2）都支持
     s = re.sub(r"\^\{([^{}]*)\}", r"<sup>\1</sup>", s)
     s = re.sub(r"\^([0-9A-Za-z+\-])", r"<sup>\1</sup>", s)

@@ -41,8 +41,8 @@ const api: PaperdeskApi = {
     pageEdits: (attachmentId: number) => ipcRenderer.invoke(CH.reader.pageEdits, attachmentId),
     restorePageEdit: (versionId: number) =>
       ipcRenderer.invoke(CH.reader.restorePageEdit, versionId),
-    listAnnotations: (attachmentId) =>
-      ipcRenderer.invoke(CH.reader.listAnnotations, attachmentId),
+    listAnnotations: (attachmentId, translationId) =>
+      ipcRenderer.invoke(CH.reader.listAnnotations, attachmentId, translationId),
     figures: (attachmentId) => ipcRenderer.invoke(CH.reader.figures, attachmentId),
     modules: (attachmentId) => ipcRenderer.invoke(CH.reader.modules, attachmentId),
     formulas: (attachmentId) => ipcRenderer.invoke(CH.reader.formulas, attachmentId),
@@ -104,6 +104,10 @@ const api: PaperdeskApi = {
     run: (opts) => ipcRenderer.invoke(CH.survey.run, opts)
   },
   translate: {
+    glossary: (id) => ipcRenderer.invoke(CH.translate.glossary, id),
+    saveTerm: (input) => ipcRenderer.invoke(CH.translate.saveTerm, input),
+    removeTerm: (attachmentId, id) => ipcRenderer.invoke(CH.translate.removeTerm, attachmentId, id),
+    prepareGlossary: (id) => ipcRenderer.invoke(CH.translate.prepareGlossary, id),
     run: (attachmentId, opts) => ipcRenderer.invoke(CH.translate.run, attachmentId, opts),
     retranslatePage: (id, page) =>
       ipcRenderer.invoke(CH.translate.retranslatePage, id, page),

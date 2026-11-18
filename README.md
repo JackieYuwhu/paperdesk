@@ -1,16 +1,16 @@
-# PaperDesk v0.1.0
+# PaperDesk v0.1.1
 
 本地论文研究工作台，将文献管理、PDF 阅读与批注、翻译、笔记和知识整理放在一个桌面应用中。
 
-[下载 Windows 安装包](https://github.com/JackieYuwhu/paperdesk/releases/latest) · [安装与部署](docs/DEPLOY.md) · [版本说明](docs/RELEASE-v0.1.0.md) · [反馈问题](https://github.com/JackieYuwhu/paperdesk/issues)
+[下载 Windows 安装包](https://github.com/JackieYuwhu/paperdesk/releases/latest) · [安装与部署](docs/DEPLOY.md) · [版本说明](docs/RELEASE-v0.1.1.md) · [反馈问题](https://github.com/JackieYuwhu/paperdesk/issues)
 
 ![PaperDesk 文库工作区（示例数据）](docs/assets/workspace-library.png)
 
 ## 主要功能
 
 - **文献管理**：导入 PDF、文件夹或文献链接，使用多级分组、分组说明和标签整理文库。
-- **阅读与批注**：PDF 阅读、目录、文内查找、彩色高亮、批注和原文定位。
-- **翻译与问答**：划词翻译、整篇翻译、原文与译文对照、基于论文内容的问答与拆解。
+- **阅读与批注**：PDF 阅读、目录、文内查找、彩色下划线、原译文批注和原文定位。
+- **翻译与问答**：划词翻译、整篇翻译、原文与译文对照、阅读 AI 浮窗、文章术语库和基于论文内容的问答与拆解。
 - **笔记与知识整理**：Markdown 笔记、批注引用、知识库与思维地图。
 - **文献研究**：元数据识别、相关论文、文献检索和领域调研。
 - **批量任务**：按选中文献、分组或标签执行翻译、拆解等任务，查看进度并取消或重试。
@@ -21,7 +21,7 @@
 
 当前提供 **Windows x64** 安装包。
 
-1. 在 [Releases](https://github.com/JackieYuwhu/paperdesk/releases/latest) 下载 `PaperDesk-0.1.0-x64-Setup.exe`，安装并启动。
+1. 在 [Releases](https://github.com/JackieYuwhu/paperdesk/releases/latest) 下载 `PaperDesk-0.1.1-x64-Setup.exe`，安装并启动。
 2. 安装 Python 3.10+（建议 3.13），并安装下方所需依赖。**安装包尚未内置 Python。**
 3. 导入一篇 PDF；如需模型翻译和问答，在设置中配置自己的模型服务。
 

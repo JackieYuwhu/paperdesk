@@ -44,6 +44,7 @@ const MindMapPanel = lazy(() => import('./features/mindmap/MindMapPanel').then((
 const StagingPanel = lazy(() => import('./features/knowledge/StagingPanel').then((m) => ({ default: m.StagingPanel })))
 const KnowledgePanel = lazy(() => import('./features/knowledge/KnowledgePanel').then((m) => ({ default: m.KnowledgePanel })))
 import { Icon } from './components/Icon'
+import { ReadingAssistant } from './features/ai/ReadingAssistant'
 import type { ViewMode } from './features/translate/TranslationPanel'
 import { pickTranslation } from '@shared/translation-pick'
 import {
@@ -104,6 +105,7 @@ export default function App(): React.JSX.Element {
   const [commandOpen, setCommandOpen] = useState(false)
   const [commandQuery, setCommandQuery] = useState('')
   const [readerMore, setReaderMore] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
   const [density, setDensity] = useState(() => localStorage.getItem('paperdesk.ui.density') === 'compact' ? 'compact' : 'comfortable')
   const [taskStatus, setTaskStatus] = useState('后台任务')
   const [items, setItems] = useState<Item[]>([])
@@ -157,9 +159,13 @@ export default function App(): React.JSX.Element {
     sbCollapsed,
     setSbCollapsed,
     setActiveGroup,
-    selectTab,
+    selectTab: selectPanel,
     toggleLeft
   } = usePanels(() => setPanelAdjusted(true))
+  const selectTab = useCallback((id: string): void => {
+    if (id === 'ai') { setAiOpen(true); return }
+    selectPanel(id)
+  }, [selectPanel])
   /** 已完成状态恢复的文档 id：用于避免切换瞬间把上一篇的状态写进新篇 */
   const [hydratedDocId, setHydratedDocId] = useState<number | null>(null)
   /** 切换文档时待应用的视图（待译文就绪后校验并生效） */
@@ -369,26 +375,17 @@ export default function App(): React.JSX.Element {
     }
   }, [layoutMode, leftView, sbCollapsed, sbW])
   const applyLayout = (m: LayoutMode): void => {
+    if (m === 'focus' && (workspace !== 'reader' || activeAttachmentId == null)) return
     if (m === layoutMode) return
     setLayoutMode(m)
     setPanelAdjusted(true)
-    const snap = readLayout(m)
-    if (snap) {
-      setLeftView(snap.leftView)
-      setSbCollapsed(snap.sbCollapsed)
-      setSbW(clampSbW(snap.sbW))
-      return
-    }
     if (m === 'focus') {
       // 专注阅读：收起左栏功能区，把横向空间全部留给论文
       setSbCollapsed(true)
-      setLeftView(null)
-      setSbW(clampSbW(320))
     } else {
-      // 整理文库：展开文件库，给分组与列表更宽的栏
-      setLeftView('library')
-      setSbCollapsed(false)
-      setSbW(clampSbW(360))
+      const snap = readLayout('library')
+      setSbCollapsed(snap?.sbCollapsed ?? false)
+      if (snap) setSbW(clampSbW(snap.sbW))
     }
   }
 
@@ -1025,10 +1022,12 @@ export default function App(): React.JSX.Element {
       return
     }
     const page = Math.max(1, Math.floor(readPage))
+    const attachmentAtStart = activeAttachmentId
     setRePageBusy(true)
     setProgress(`正在重译第 ${page} 页…`)
     try {
       const next = await window.api.translate.retranslatePage(translation.id, page)
+      if (activeAttachmentRef.current !== attachmentAtStart) return
       setTranslation(next)
       const epoch = translationEpoch + 1
       setTranslationEpoch(epoch)
@@ -1129,6 +1128,8 @@ export default function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [workspace])
   const sidebarCollapsed = sbCollapsed || leftView === null
+  const sidebarLabel = leftView === 'panel' ? PANELS.find((p) => p.id === rightTab)?.title ?? '功能'
+    : ({ library: '文库', toc: '目录', search: '搜索', detail: '文献详情' } as Record<string, string>)[leftView ?? 'library'] ?? '文库'
   return (
     <Suspense fallback={<div className="workspace-loading" role="status">正在载入工作区…</div>}>
     <div className="desk-shell" data-workspace={workspace}>
@@ -1149,16 +1150,14 @@ export default function App(): React.JSX.Element {
       style={{
         gridTemplateColumns: workspace === 'tasks' || workspace === 'research' || workspace === 'knowledge'
           ? 'minmax(0, 1fr)'
-          : !sidebarCollapsed && ((workspace === 'reader' && leftView === 'panel') || (workspace === 'library' && leftView === 'detail'))
-            ? `minmax(0, 1fr) 5px ${Math.max(320, effSbW)}px`
-            : sidebarCollapsed ? '32px minmax(0, 1fr)' : `${workspace === 'library' ? Math.min(280, effSbW) : effSbW}px 5px minmax(0, 1fr)`
+          : sidebarCollapsed ? '32px minmax(0, 1fr)' : `${leftView === 'panel' || leftView === 'detail' ? Math.max(320, effSbW) : workspace === 'library' ? Math.min(280, effSbW) : effSbW}px 5px minmax(0, 1fr)`
       }}
     >
       {sidebarCollapsed ? (
         <div className="side-strip side-strip--left" data-testid="sb-strip">
           <button
             className="icon ghost"
-            title="展开文库栏"
+            title={`展开${sidebarLabel}`}
             data-testid="sb-expand"
             onClick={() => {
               setLeftView((v) => v ?? 'library')
@@ -1167,7 +1166,7 @@ export default function App(): React.JSX.Element {
           >
             <Icon name="right" size={16} />
           </button>
-          <span className="side-strip__label">文库</span>
+          <span className="side-strip__label">{sidebarLabel}</span>
         </div>
       ) : leftView === 'detail' && detailItemId != null ? (
         <ItemDetailPanel
@@ -1205,7 +1204,7 @@ export default function App(): React.JSX.Element {
           </div>
           {(workspace === 'research' || workspace === 'tasks') && <div className="workspace-panel-tabs">{PANELS.filter((p) => workspace === 'tasks' ? p.group === 'data' : p.group === 'research').map((p) => <button key={p.id} className={rightTab === p.id ? 'on' : ''} onClick={() => selectTab(p.id)}>{p.title}</button>)}</div>}
           <div className="leftpanels__body">
-            {PANELS.filter((p) => visited.has(p.id)).map((p) => (
+            {PANELS.filter((p) => p.id !== 'ai' && rightTab === p.id).map((p) => (
               <div
                 key={p.id}
                 className="panelwrap"
@@ -1337,7 +1336,7 @@ export default function App(): React.JSX.Element {
           </div>
 
           <button
-            className="ghost toolbar-secondary"
+            className="ghost"
             title={
               translation?.path
                 ? `只重译当前第 ${readPage} 页（约 10-30 秒），其余页不动`
@@ -1645,7 +1644,7 @@ export default function App(): React.JSX.Element {
 
         <div className="viewer">
           {workspace === 'library' && <LibraryWorkspace items={items} group={groupFilter} activeId={activeItemId} loading={libraryLoading} error={libraryError} onRetry={() => void refresh()} onRead={(id) => { selectItem(id); setSbCollapsed(true) }} onDetail={(id) => { openItemDetail(id); setSbCollapsed(false) }} onDelete={(id) => void handleDeleteItem(id)} onImport={() => void handleImport(aiGroupName)} onImportFolder={() => void handleImportFolder(aiGroupName)} onSearch={() => { setLeftView('search'); setSbCollapsed(false) }} />}
-          {readerOpened && <div className="reader-retained" style={{ display: workspace === 'reader' ? undefined : 'none' }}>
+          {readerOpened && workspace === 'reader' && <div className="reader-retained">
           <Suspense fallback={<div className="workspace-loading" role="status">正在打开论文…</div>}>
           <ErrorBoundary
             label="阅读器出错了"
@@ -1655,13 +1654,14 @@ export default function App(): React.JSX.Element {
               // 译文存在时同时挂载「原文」和「对照」两套阅读器，用 CSS 切换可见性：
               // 切视图不再卸载/重建 PDF 版面，避免每次切换都重新解码、重排、重绘（用户看到白屏卡 10 秒）。
               <div className="viewer__stack">
-                {translation?.path && (compareOpened || viewMode === 'bilingual') && (
+                {translation?.path && viewMode === 'bilingual' && (
                   <div
                     className="viewer__pane"
                     data-hidden={viewMode === 'bilingual' ? '0' : '1'}
                     aria-hidden={viewMode !== 'bilingual'}
                   >
                     <CompareView
+                      key={`${activeAttachmentId}-${translation.id}`}
                       attachmentId={activeAttachmentId}
                       translationId={translation.id}
                       reloadKey={translationEpoch}
@@ -1696,7 +1696,7 @@ export default function App(): React.JSX.Element {
                     />
                   </div>
                 )}
-                <div
+                {!(viewMode === 'bilingual' && translation?.path) && <div
                   className="viewer__pane"
                   data-hidden={viewMode === 'bilingual' && translation?.path ? '1' : '0'}
                   aria-hidden={viewMode === 'bilingual' && !!translation?.path}
@@ -1749,7 +1749,7 @@ export default function App(): React.JSX.Element {
                       setTranslationEpoch((n) => n + 1)
                     }}
                   />
-                )}                </div>
+                )}                </div>}
               </div>
             ) : activeItemId != null ? (
               <ItemPreview
@@ -1830,6 +1830,12 @@ export default function App(): React.JSX.Element {
         </div>
       </div>
 
+      {workspace === 'reader' && <button className="reading-ai-launch" data-testid="reading-ai-open" onClick={() => setAiOpen(true)}>✦ 阅读 AI</button>}
+      {aiOpen && <ReadingAssistant onClose={() => setAiOpen(false)}>
+        <Suspense fallback={<div>正在打开助手…</div>}>
+          <div key={activeAttachmentId} className="reading-assistant__body">{PANELS.find((p) => p.id === 'ai')?.render({ ...panelBase, active: true })}</div>
+        </Suspense>
+      </ReadingAssistant>}
       {stagingOpen && (<Suspense fallback={<div className="overlay-loading" role="status">正在打开暂存区…</div>}>
         <StagingPanel
           onClose={() => setStagingOpen(false)}

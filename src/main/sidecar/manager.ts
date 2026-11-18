@@ -153,6 +153,7 @@ export async function ensureSidecar(): Promise<string> {
     })
 
     const reset = () => {
+      if (proc !== child) return
       proc = null
       baseUrl = null
     }
@@ -184,6 +185,7 @@ export async function ensureSidecar(): Promise<string> {
         },
         (e) => {
           settled = true
+          if (proc === child) killProc()
           reject(e)
         }
       )

@@ -95,6 +95,8 @@ export interface Annotation {
 
 export interface NewAnnotation {
   attachmentId: number
+  /** null = source PDF; otherwise coordinates belong to this translation version. */
+  translationId?: number | null
   type: AnnotationType
   pageIndex: number
   rects: [number, number, number, number][]

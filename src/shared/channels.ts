@@ -116,6 +116,10 @@ export const CH = {
     run: 'survey:run'
   },
   translate: {
+    glossary: 'translate:glossary',
+    saveTerm: 'translate:saveTerm',
+    removeTerm: 'translate:removeTerm',
+    prepareGlossary: 'translate:prepareGlossary',
     run: 'translate:run',
     retranslatePage: 'translate:retranslatePage',
     cancel: 'translate:cancel',

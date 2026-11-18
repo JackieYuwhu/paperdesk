@@ -17,6 +17,7 @@ const DiscoveryPanel = lazy(() => import('../features/discovery/DiscoveryPanel')
 const AiPanel = lazy(() => import('../features/ai/AiPanel').then((m) => ({ default: m.AiPanel })))
 const BatchPanel = lazy(() => import('../features/batch/BatchPanel').then((m) => ({ default: m.BatchPanel })))
 const TranslationPanel = lazy(() => import('../features/translate/TranslationPanel').then((m) => ({ default: m.TranslationPanel })))
+const GlossaryPanel = lazy(() => import('../features/translate/GlossaryPanel').then((m) => ({ default: m.GlossaryPanel })))
 const JournalsPanel = lazy(() => import('../features/journals/JournalsPanel').then((m) => ({ default: m.JournalsPanel })))
 const WorksPanel = lazy(() => import('../features/works/WorksPanel').then((m) => ({ default: m.WorksPanel })))
 const PaperAnalysisPanel = lazy(() => import('../features/analysis/PaperAnalysisPanel').then((m) => ({ default: m.PaperAnalysisPanel })))
@@ -195,6 +196,13 @@ export const PANELS: PanelModule[] = [
         groupLabel={c.groupLabel}
       />
     )
+  },
+  {
+    id: 'glossary',
+    title: '词汇库',
+    icon: 'book',
+    group: 'read',
+    render: (c) => <GlossaryPanel key={c.attachmentId} attachmentId={c.attachmentId} />
   },
   {
     id: 'translate',

@@ -99,7 +99,7 @@ export function CompareView({
     return () => {
       cancelled = true
     }
-  }, [translationId])
+  }, [translationId, reloadKey])
 
   // 右窗格呈现方式：PDF 版式（默认，保持原行为）/ 结构化文本（按原文段落、列表、标题重排）。
   // 文本面只读译文 md（translate.py::_write_translation_md 产物），不走 map 通道。
@@ -315,9 +315,9 @@ export function CompareView({
   useEffect(() => {
     const rk = reloadKey ?? 0
     if (rk === lastReloadRef.current || rightPages <= 0) return
-    lastReloadRef.current = rk
     const t = window.setTimeout(() => {
-      setRightScroll({ page, frac: 0, nonce: nextNonce() })
+      lastReloadRef.current = rk
+      setRightScroll({ page: page - 1, frac: 0, nonce: nextNonce() })
     }, 120)
     return () => window.clearTimeout(t)
   }, [reloadKey, rightPages, page])
@@ -328,12 +328,13 @@ export function CompareView({
   const initialAlignedRef = useRef(false)
   useEffect(() => {
     if (rightPages <= 0 || initialAlignedRef.current) return
-    initialAlignedRef.current = true
     const t = window.setTimeout(() => {
-      setRightScroll({ page, frac: 0, nonce: nextNonce() })
+      initialAlignedRef.current = true
+      setRightScroll({ page: page - 1, frac: 0, nonce: nextNonce() })
     }, 120)
     return () => window.clearTimeout(t)
   }, [rightPages, page])
+  const reportedPageRef = useRef<number | null>(null)
 
   // 联动：任一侧翻页 → 交给上层受控页码，另一侧通过 syncPage 跟随。
   const onLeftPage = useCallback(
@@ -344,6 +345,7 @@ export function CompareView({
         originRef.current === 'left' || (originRef.current === 'right' && rightMode === 'text')
       if (!pass) return
       lastDocPageRef.current = p
+      reportedPageRef.current = p
       onPageChange(p)
     },
     [onPageChange, rightMode]
@@ -352,6 +354,7 @@ export function CompareView({
     (p: number): void => {
       // 译文页数可能与原文不同，但页码就是它当前所在页；由用户滚右侧时反向驱动左侧。
       if (originRef.current !== 'right') return
+      reportedPageRef.current = p
       onPageChange(p)
     },
     [onPageChange]
@@ -422,10 +425,13 @@ export function CompareView({
   useEffect(() => {
     if (lastSyncPageRef.current === page) return
     lastSyncPageRef.current = page
-    if (!sync || originRef.current !== 'left' || page < 1) return
+    if (reportedPageRef.current === page) { reportedPageRef.current = null; return }
+    if (!sync || page < 1) return
+    originRef.current = 'left'
     const anchorPage = page - 1
     // 末页的页首位置常被 scrollTop 上界夹住：此时用 frac 1（对齐到页底）才能让两侧视口中线一致
     const frac = leftPages > 0 && page >= leftPages ? 1 : 0
+    setLeftScroll({ page: anchorPage, frac, nonce: nextNonce() })
     if (rightMode === 'text') {
       setDocScroll({ page: anchorPage, frac, nonce: nextNonce() })
       docSeekSkipRef.current = { page, ts: Date.now() }
@@ -454,6 +460,7 @@ export function CompareView({
           页面对应仍按源页对齐，但建议重新翻译以恢复 1:1 页码。
         </div>
       ) : null}
+      {blockMap == null && <div className="compare__warn">此译文尚无可靠的选区对应信息，暂不显示另一侧标记；重译后可更新对应关系。</div>}
       <div className="compare__body">
         <div className="compare__pane" data-testid="compare-pane-original">
           <div className="compare__bar">原文 PDF（可批注）</div>
@@ -499,7 +506,7 @@ export function CompareView({
         <div className="compare__pane" data-testid="compare-pane-translation">
           <div className="compare__bar">
             <span className="compare__bar-label">
-              {rightMode === 'pdf' ? '译文 PDF（只读）' : '译文（结构化文本）'}
+              {rightMode === 'pdf' ? '译文 PDF（可批注）' : '译文（结构化文本）'}
             </span>
             {translationId > 0 ? (
               <div className="seg compare__mode" role="group" aria-label="译文呈现方式">
@@ -534,7 +541,10 @@ export function CompareView({
               attachmentId={attachmentId}
               translationId={translationId}
               reloadKey={reloadKey}
-              itemId={null}
+              itemId={itemId}
+              onAddToNote={onAddToNote}
+              onAskSelection={onAskSelection}
+              onOpenSettings={onOpenSettings}
               focus={focus}
               onSelectionRects={(s) => setRightSel(mapSelection(s, 'dst2src'))}
               syncRects={leftSel}

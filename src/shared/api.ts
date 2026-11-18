@@ -224,7 +224,7 @@ export interface PaperdeskApi {
       translationRegenerated: boolean
       warnings: string[]
     }>
-    listAnnotations(attachmentId: number): Promise<Annotation[]>
+    listAnnotations(attachmentId: number, translationId?: number | null): Promise<Annotation[]>
     /** 每页的矢量图形区域 + 图表题注（侧车脚本计算），用于点击图表引用时精确裁剪预览 */
     figures(attachmentId: number): Promise<
       Array<{
@@ -379,6 +379,10 @@ export interface PaperdeskApi {
     run(opts: import('./survey').SurveyRunOptions): Promise<import('./survey').SurveyResult>
   }
   translate: {
+    glossary(attachmentId: number): Promise<import('./glossary').ArticleTerm[]>
+    saveTerm(input: import('./glossary').ArticleTermInput): Promise<import('./glossary').ArticleTerm[]>
+    removeTerm(attachmentId: number, id: number): Promise<import('./glossary').ArticleTerm[]>
+    prepareGlossary(attachmentId: number): Promise<import('./glossary').ArticleTerm[]>
     run(attachmentId: number, opts?: TranslateOptions): Promise<Translation>
     /** 只重译译文 PDF 的某一页（1 基），其余页不动 */
     retranslatePage(id: number, page: number): Promise<Translation>

@@ -1184,7 +1184,7 @@ if True:
     _tr8 = ["译文 ⟦0⟧ 只有第一个符号"]
     _d8, _m8, _u8 = TR8._restore_formula_placeholders(_flat8, _tr8)
     check("math: partial placeholder loss counted", _d8 == 1 and _m8 == 1 and _u8 == 0, f"dropped={_d8} missing={_m8} unreliable={_u8}")
-    check("math: existing placeholder restored", "𝒫" in _tr8[0] and "⟦0⟧" not in _tr8[0], ascii(_tr8[0]))
+    check("math: missing placeholder preserves original paragraph", _tr8[0] == _flat8[0]["raw"], ascii(_tr8[0]))
 
 # ---- 版面：译文向下扩展不得压到图片（图片没有文字，不在 hard_obstacles 里）----
 if True:

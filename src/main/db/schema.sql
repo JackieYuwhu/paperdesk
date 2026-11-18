@@ -7,6 +7,23 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS article_terms (
+  id INTEGER PRIMARY KEY,
+  attachment_id INTEGER NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+  term TEXT NOT NULL COLLATE NOCASE,
+  sense TEXT NOT NULL DEFAULT '',
+  translation TEXT NOT NULL,
+  context TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'user',
+  source_url TEXT NOT NULL DEFAULT '',
+  locked INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(attachment_id, term, sense)
+);
+CREATE TABLE IF NOT EXISTS article_terminology_state (
+  attachment_id INTEGER PRIMARY KEY REFERENCES attachments(id) ON DELETE CASCADE,
+  fingerprint TEXT NOT NULL
+);
+
 -- ============ 论文条目 ============
 CREATE TABLE IF NOT EXISTS items (
   id            INTEGER PRIMARY KEY,

@@ -117,6 +117,9 @@ export function AiPanel({
   const selectionRef = useRef<AskSelection | null>(null)
   /** 当前请求标识（取消用） */
   const requestIdRef = useRef('')
+  useEffect(() => () => {
+    if (requestIdRef.current) void window.api.ai.cancel(requestIdRef.current).catch(() => undefined)
+  }, [])
   /**
    * AI 工具库（PD54）：联网检索是否被用户关掉。
    * 关闭后开关禁用并给出原因，实际请求也强制 web=false（不只靠界面禁用）。

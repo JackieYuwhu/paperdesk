@@ -1,5 +1,21 @@
 # 代码功能对照表（CODE-MAP）
 
+## 2026-11-18 阅读修复（v0.1.1）
+
+| 功能 | 文件 / 入口 / 行为 |
+| --- | --- |
+| 阅读浮窗 / 精读提示 | `features/ai/ReadingAssistant.tsx::ReadingAssistant`；`App.tsx::selectTab` 将 ai 转到浮窗；`AiPanel` 卸载取消请求；`presets.ts` 快速阅读及精读 |
+| 左栏 / 专注阅读 | `App.tsx::applyLayout/sidebarLabel` 仅调整当前阅读布局；`hooks/workbench.ts::usePanels` 记录最后功能和历史；`styles.css` 固定功能及详情在左侧 |
+| 对照同步 | `CompareView` 页码转换为零基锚点、区分显式导航与用户滚动；reloadKey 重新读取 map；左右页头 36px |
+| 单页重译版本 | `main/services/translate.ts::retranslatePage/retranslateWorkingPage` 暂存文件→调用→事务提交，失败回收；沿用未改页标注、旧页标注留在历史版本；PDF/map/Markdown/FTS 一起更新 |
+| 译文下划线批注 | `shared/types.ts::NewAnnotation.translationId`；reader IPC 在 position JSON 中区分版本；PdfViewer 原译文均可标注，旧高亮显示为下划线 |
+| 文章术语库 | `shared/glossary.ts` 类型及校验；`main/services/article-glossary.ts::listArticleTerms/saveArticleTerm/removeArticleTerm/prepareArticleTerms`；schema 的 article_terms/article_terminology_state；translate IPC/API/preload 四点接线；`GlossaryPanel` A–Z 编辑与多义词 |
+| 术语约束及缓存 | `translate.ts::runTranslationJob` 先补本文术语，再传 terminology；`translation-reuse.ts::canReuseTranslation` 校验术语指纹；Python TranslateRequest/simple_translate/retranslate_page 透传词义约束 |
+| 公式及句界保护 | `inline_math.py::inline_math_html/to_unicode_math` 保留分组直到上下标解析；`translate.py::_marked_sentences/_unmark_sentences/_segment_pieces/_restore_formula_placeholders` 校验句界与公式；缺失/重复公式保留原段落 |
+| 内存及查找 | `PdfViewer` 仅挂载当前模式，48 MiB 离屏缓存 / 96 MiB 位图预算，停止全文位图补齐；ScrollPages 的 searchQuery effect 按需只建文本层；`sidecar/manager.ts` 旧进程退出不清掉新实例 |
+| 验收 | `scripts/test-reading.ts`、`python/tests/test_reading_regressions.py`；`test-workspace-ui.cjs` 增加左栏、浮窗、多义词、重译版本、译文批注、64页位图预算及末页查找；设计取舍与外部候选见 `docs/READING-IMPROVEMENTS.md` |
+| 普通账户打包 | `scripts/after-pack.cjs::ensureMedium` 设置完整性标签权限不足时检查现有 ACL；没有低完整性标签则保留默认标签，检测到低标签仍拒绝发布 |
+
 > **维护规则（必须遵守）**
 > 1. 改代码前先读本表，按「功能 → 文件/函数」定位，不要全文盲搜。
 > 2. **每次修改代码，必须在同一次改动里同步更新本表**（功能位置、函数名、行为说明、行号锚点）。
